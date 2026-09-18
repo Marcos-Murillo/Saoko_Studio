@@ -10,7 +10,7 @@ import {
 import {
   getDoc, getDocs, setDoc, updateDoc, doc, collection, query, where, serverTimestamp,
 } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase/config'
+import { db, getFirebaseAuth } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { AppRole } from '@/lib/auth/roles'
 import { normalizeDocumentNumber } from '@/lib/auth/identity'
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (byId.exists()) {
         const profile = mapAdminUser(byId.id, byId.data(), firebaseUser.uid)
         if (!profile.isActive) {
-          await firebaseSignOut(auth)
+          await firebaseSignOut(getFirebaseAuth())
           setAdminUser(null)
           return
         }
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, { merge: true })
         const profile = mapAdminUser(firebaseUser.uid, data, firebaseUser.uid)
         if (!profile.isActive) {
-          await firebaseSignOut(auth)
+          await firebaseSignOut(getFirebaseAuth())
           setAdminUser(null)
           return
         }
@@ -144,7 +144,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+      setLoading(false)
+      return
+    }
+    const unsub = onAuthStateChanged(getFirebaseAuth(), async (firebaseUser) => {
       setUser(firebaseUser)
       if (firebaseUser) await loadAdminUser(firebaseUser)
       else setAdminUser(null)
@@ -155,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (emailOrUsername: string, password: string) => {
     const email = await resolveLoginEmail(emailOrUsername)
-    const cred = await signInWithEmailAndPassword(auth, email, password)
+    const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
     await loadAdminUser(cred.user)
     const profile = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, cred.user.uid))
     return { mustSetPassword: profile.data()?.mustSetPassword === true }
@@ -178,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const completePasswordSetup = async (password: string) => {
-    const current = auth.currentUser
+    const current = getFirebaseAuth().currentUser
     if (!current) throw new Error('No hay una sesión activa')
     const cedula = normalizeDocumentNumber(adminUser?.documentNumber ?? '')
     if (cedula && password === cedula) {
@@ -199,25 +203,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const email = await resolveLoginEmail(input.email.trim())
-    const cred = await signInWithEmailAndPassword(auth, email, cedula)
+    const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email, cedula)
     const snap = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, cred.user.uid))
     if (!snap.exists()) {
-      await firebaseSignOut(auth)
+      await firebaseSignOut(getFirebaseAuth())
       throw new Error('No encontramos tu usuario. Pide al administrador que te cree la cuenta.')
     }
 
     const data = snap.data()
     const storedCedula = normalizeDocumentNumber(String(data.documentNumber ?? ''))
     if (storedCedula !== cedula) {
-      await firebaseSignOut(auth)
+      await firebaseSignOut(getFirebaseAuth())
       throw new Error('El correo y la cédula no coinciden.')
     }
     if (data.mustSetPassword !== true) {
-      await firebaseSignOut(auth)
+      await firebaseSignOut(getFirebaseAuth())
       throw new Error('Ya tienes una contraseña. Usa el inicio de sesión normal.')
     }
     if (data.isActive !== true) {
-      await firebaseSignOut(auth)
+      await firebaseSignOut(getFirebaseAuth())
       throw new Error('Tu usuario está inactivo.')
     }
 
@@ -227,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await firebaseSignOut(auth)
+    await firebaseSignOut(getFirebaseAuth())
   }
 
   return (
