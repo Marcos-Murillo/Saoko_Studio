@@ -1,0 +1,246 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Saoko Studio Design System ─────────────────────────────────────────── */
+:root {
+  --radius: 0.75rem;
+
+  /* Shadcn tokens mapped to dark-gold theme */
+  --background:           #0c0c0c;
+  --foreground:           #f0ead6;
+  --card:                 #161616;
+  --card-foreground:      #f0ead6;
+  --popover:              #1f1f1f;
+  --popover-foreground:   #f0ead6;
+  --primary:              #c9a84c;
+  --primary-foreground:   #000000;
+  --secondary:            #1f1f1f;
+  --secondary-foreground: #a09070;
+  --muted:                #1a1a1a;
+  --muted-foreground:     #5c5045;
+  --accent:               #252525;
+  --accent-foreground:    #f0ead6;
+  --destructive:          #e05252;
+  --destructive-foreground: #f0ead6;
+  --border:               #2a2a2a;
+  --input:                #2a2a2a;
+  --ring:                 #c9a84c;
+
+  /* Sidebar tokens */
+  --sidebar:              #101010;
+  --sidebar-foreground:   #a09070;
+  --sidebar-primary:      #c9a84c;
+  --sidebar-primary-foreground: #000;
+  --sidebar-accent:       #1a1a1a;
+  --sidebar-accent-foreground: #f0ead6;
+  --sidebar-border:       #1e1e1e;
+  --sidebar-ring:         #c9a84c;
+  --sidebar-width:        0px;
+
+  /* Custom status tokens */
+  --paid:    #4caf7d;
+  --debt:    #e05252;
+  --credit:  #4a90d9;
+  --partial: #e8a030;
+  --pending: #c9a84c;
+
+  /* Gold shorthands */
+  --gold:        #c9a84c;
+  --gold-light:  #e8c97a;
+  --gold-dark:   #a07830;
+  --gold-muted:  rgba(201,168,76,.14);
+
+  --glass:         rgba(22, 22, 22, 0.55);
+  --glass-border:  rgba(201, 168, 76, 0.12);
+  --workspace:     #0f0f0f;
+}
+
+@layer base {
+  html { color-scheme: dark; }
+  * { box-sizing: border-box; border-color: var(--border); }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  button, a { -webkit-tap-highlight-color: transparent; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--card); }
+::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dark); }
+::selection { background: rgba(201,168,76,.2); color: var(--gold-light); }
+
+.glass-card,
+.card,
+.kpi-card,
+[data-slot="card"],
+[data-slot="sheet-content"] {
+  background: var(--glass) !important;
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28) !important;
+}
+
+[data-slot="sheet-content"] {
+  border-left: 1px solid var(--glass-border) !important;
+  border-right: none !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-radius: 0 !important;
+}
+
+[data-slot="sheet-content"][data-side="right"] {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: 0 !important;
+  width: min(420px, 92vw) !important;
+  max-width: min(420px, 92vw) !important;
+  min-width: 0 !important;
+  height: 100dvh !important;
+}
+
+.kpi-card {
+  border-radius: 1rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+@keyframes saoko-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.saoko-nested-drawer {
+  position: fixed !important;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 92vw);
+  z-index: 80;
+  animation: saoko-slide-in-right 320ms cubic-bezier(.22, .9, .32, 1);
+  will-change: transform;
+}
+
+@media (min-width: 768px) {
+  :root { --sidebar-width: 240px; }
+  html[data-sidebar-collapsed] { --sidebar-width: 80px; }
+}
+
+@media (max-width: 767px) {
+  :root, html { --sidebar-width: 0px !important; }
+
+  html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  [data-slot="table"] {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .saoko-col-action {
+    width: 2.75rem;
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: var(--card);
+    box-shadow: -10px 0 12px rgba(0,0,0,.28);
+  }
+
+  table.data-table {
+    width: 100%;
+    table-layout: fixed;
+  }
+  table.data-table th,
+  table.data-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kpi-card,
+  [data-slot="card"],
+  .card {
+    border-radius: 1.35rem;
+  }
+
+  [data-slot="input"] {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .page-header-actions button,
+  .page-header-actions a {
+    min-height: 44px;
+  }
+
+  .saoko-chip-nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .saoko-chip-nav::-webkit-scrollbar { display: none; }
+  .saoko-chip-nav a {
+    min-height: 44px;
+    flex: 0 0 auto;
+  }
+
+  [data-slot="sheet-content"][data-side="right"],
+  [data-slot="sheet-content"][data-side="left"] {
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: min(92dvh, 100%) !important;
+    border-radius: 24px 24px 0 0 !important;
+    border: 1px solid var(--glass-border) !important;
+    border-bottom: none !important;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  [data-slot="sheet-content"][data-side="right"]::before,
+  [data-slot="sheet-content"][data-side="left"]::before {
+    content: "";
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.22);
+    margin: 10px auto 0;
+    flex-shrink: 0;
+  }
+
+  .saoko-nested-drawer {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: min(92dvh, 100%);
+    border-radius: 24px 24px 0 0;
+    border-left: none !important;
+    animation: saoko-slide-in-bottom 320ms cubic-bezier(.22, .9, .32, 1);
+  }
+}
+
+@keyframes saoko-slide-in-bottom {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}

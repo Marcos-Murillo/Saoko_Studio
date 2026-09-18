@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myUserPath() {
+      return /databases/$(database)/documents/adminUsers/$(request.auth.uid);
+    }
+
+    function myProfile() {
+      return get(myUserPath()).data;
+    }
+
+    function isActiveUser() {
+      return signedIn()
+        && exists(myUserPath())
+        && myProfile().isActive == true;
+    }
+
+    function role() {
+      return myProfile().role;
+    }
+
+    function isTeacher() {
+      return isActiveUser() && role() == 'teacher';
+    }
+
+    function isOps() {
+      return isActiveUser() && role() in ['staff', 'admin', 'super_admin'];
+    }
+
+    function isAdmin() {
+      return isActiveUser() && role() in ['admin', 'super_admin'];
+    }
+
+    function isSuper() {
+      return isActiveUser() && role() == 'super_admin';
+    }
+
+    // Document ID MUST equal Firebase Auth UID. Create the first super_admin
+    // in the console: Authentication user + document adminUsers/{uid}.
+    match /adminUsers/{userId} {
+      allow get: if signedIn() && (
+        userId == request.auth.uid
+        || resource.data.uid == request.auth.uid
+        || isAdmin()
+      );
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if (
+        isAdmin()
+        && request.resource.data.uid == userId
+        && (
+          isSuper()
+          || request.resource.data.role in ['admin', 'staff', 'teacher']
+        )
+      ) || (
+        signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'super_admin'
+        && request.resource.data.isActive == true
+        && request.auth.token.email.matches('superadmin\\..+@saokostudio\\.internal')
+      );
+      allow update: if (
+        isAdmin()
+        && (
+          isSuper()
+          || resource.data.role != 'super_admin'
+        )
+      ) || (
+        signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['mustSetPassword', 'updatedAt'])
+        && request.resource.data.mustSetPassword == false
+      );
+      allow delete: if false;
+    }
+
+    // Cédula → email for login. Get is public so users can sign in with document
+    // number; listing is denied so the directory cannot be enumerated.
+    match /loginAliases/{documentNumber} {
+      allow get: if true;
+      allow list: if false;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['mustSetPassword'])
+          && request.resource.data.mustSetPassword == false
+        );
+    }
+
+    match /modalities/{id} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+    match /categories/{id} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+    match /levels/{id} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+    match /paymentMethods/{id} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+    match /expenseCategories/{id} {
+      allow read: if isOps();
+      allow write: if isAdmin();
+    }
+
+    match /dancers/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+    match /guardians/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+    match /dancerGuardians/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+
+    match /groups/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+    match /groupMemberships/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+    match /schedules/{id} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+
+    match /monthlyFees/{id} {
+      allow read, write: if isOps();
+    }
+    match /payments/{id} {
+      allow read, write: if isOps();
+    }
+    match /paymentAllocations/{id} {
+      allow read, write: if isOps();
+    }
+    match /dancerCredits/{id} {
+      allow read, write: if isOps();
+    }
+    match /creditTransactions/{id} {
+      allow read, write: if isOps();
+    }
+    match /expenses/{id} {
+      allow read, write: if isOps();
+    }
+
+    match /costumes/{id} {
+      allow read, write: if isOps();
+    }
+    match /costumeLoans/{id} {
+      allow read, write: if isOps();
+    }
+
+    match /events/{id} {
+      allow read, write: if isOps();
+    }
+    match /eventCategories/{id} {
+      allow read, write: if isOps();
+    }
+    match /eventRegistrations/{id} {
+      allow read, write: if isOps();
+    }
+    match /eventPayments/{id} {
+      allow read, write: if isOps();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create: if isOps();
+      allow update, delete: if false;
+    }
+  }
+}

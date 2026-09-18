@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return firestore.get(/databases/(default)/documents/adminUsers/$(request.auth.uid)).data;
+    }
+
+    function isOps() {
+      return signedIn()
+        && myProfile().isActive == true
+        && myProfile().role in ['staff', 'admin', 'super_admin'];
+    }
+
+    function isActiveUser() {
+      return signedIn()
+        && myProfile().isActive == true;
+    }
+
+    match /receipts/{fileName} {
+      allow read, write: if isOps();
+    }
+
+    match /dancer-photos/{dancerId}/{fileName} {
+      allow read: if isActiveUser();
+      allow write: if isOps();
+    }
+  }
+}
