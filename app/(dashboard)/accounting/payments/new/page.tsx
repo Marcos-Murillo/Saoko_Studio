@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatCurrency as fmtC } from '@/lib/utils/currency'
 import { getDancerCurrentMemberships } from '@/lib/services/group.service'
@@ -174,6 +174,7 @@ export default function NewPaymentPage() {
                     cursor:      'pointer',
                   }}>
                   <Avatar size="sm">
+                    {d.photoUrl && <AvatarImage src={d.photoUrl} alt={d.fullName} />}
                     <AvatarFallback style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '0.72rem', fontWeight: 700 }}>
                       {d.fullName.charAt(0)}
                     </AvatarFallback>

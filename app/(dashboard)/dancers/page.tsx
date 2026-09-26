@@ -1,9 +1,9 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, UserX, MoreHorizontal, UserMinus, DollarSign, UserPlus, Download, Pencil, ChevronLeft, MousePointerClick } from 'lucide-react'
+import { Plus, Search, UserX, MoreHorizontal, UserMinus, DollarSign, UserPlus, Download, Pencil, ChevronLeft, MousePointerClick, FolderInput, Tags } from 'lucide-react'
 import { getDancers, updateDancer, deactivateDancer, reactivateDancer } from '@/lib/services/dancer.service'
-import { getDancerCurrentMemberships, getGroups, enrollDancer } from '@/lib/services/group.service'
+import { getDancerCurrentMemberships, getGroups, enrollDancer, unenrollDancer } from '@/lib/services/group.service'
 import { getCategories } from '@/lib/services/catalog.service'
 import { registerPayment } from '@/lib/services/payment.service'
 import { getPaymentMethods } from '@/lib/services/catalog.service'
@@ -29,8 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { StatMini } from '@/components/shared/KpiCard'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
-import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -41,7 +40,7 @@ import { DancerProfilePanel } from '@/components/dancers/DancerProfilePanel'
 import { DancerFinancialPanel } from '@/components/dancers/DancerFinancialPanel'
 import { isoToTs } from '@/lib/utils/dates'
 import { downloadXlsx } from '@/lib/utils/exportExcel'
-import type { Dancer, BloodType, Group, GroupMembership, PaymentMethod, MonthlyFee } from '@/types'
+import type { Dancer, BloodType, Group, GroupMembership, PaymentMethod, MonthlyFee, Category } from '@/types'
 
 const { month: CURRENT_MONTH } = currentYearMonth()
 
@@ -234,6 +233,10 @@ export default function DancersPage() {
   const [financialOpen,     setFinancialOpen]      = useState(false)
   const [selectMode,        setSelectMode]         = useState(false)
   const [selected,          setSelected]           = useState<Set<string>>(new Set())
+  const [categories,        setCategories]         = useState<Category[]>([])
+  const [bulkMode,          setBulkMode]           = useState<'group' | 'category' | null>(null)
+  const [bulkValue,         setBulkValue]          = useState('')
+  const [bulkSaving,        setBulkSaving]         = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -241,13 +244,14 @@ export default function DancersPage() {
     if (adminUser && PERMISSIONS.canManageAccounting(adminUser.role)) {
       await ensureCurrentMonthFees({ id: adminUser.id, name: adminUser.name })
     }
-    const [d, g, m, fees] = await Promise.all([
+    const [d, g, m, fees, cats] = await Promise.all([
       getDancers(false),
       getGroups(true),
       getPaymentMethods(),
       getMonthlyFeesByPeriod(year, month),
+      getCategories(true),
     ])
-    setDancers(d); setAllGroups(g); setMethods(m); setMonthFees(fees)
+    setDancers(d); setAllGroups(g); setMethods(m); setMonthFees(fees); setCategories(cats)
     setLoading(false)
   }
 
@@ -284,6 +288,7 @@ export default function DancersPage() {
       bloodType: data.bloodType as BloodType, email: data.email,
       phone: data.phone, categoryId: data.categoryId,
       categoryName: cat?.name ?? '', notes: data.notes,
+      photoUrl: data.photoUrl || null,
     })
     toast('Bailarín actualizado')
     setEditing(null); load()
@@ -334,6 +339,53 @@ export default function DancersPage() {
       else next.delete(id)
       return next
     })
+  }
+
+  const openBulk = (mode: 'group' | 'category') => {
+    if (selected.size === 0) {
+      toast('Selecciona al menos un bailarín', 'error')
+      return
+    }
+    setBulkValue('')
+    setBulkMode(mode)
+  }
+
+  const applyBulk = async () => {
+    if (!bulkMode || !bulkValue) return
+    const ids = [...selected]
+    const picked = dancers.filter(d => ids.includes(d.id))
+    if (picked.length === 0) return
+    setBulkSaving(true)
+    try {
+      if (bulkMode === 'group') {
+        const group = allGroups.find(g => g.id === bulkValue)
+        if (!group) throw new Error('Selecciona un grupo')
+        for (const dancer of picked) {
+          const memberships = await getDancerCurrentMemberships(dancer.id)
+          for (const membership of memberships) {
+            if (membership.groupId === group.id) continue
+            await unenrollDancer(membership.id, dancer.id, membership.groupId)
+          }
+          await enrollDancer(dancer.id, dancer.fullName, group.id, group.name, group.monthlyFee)
+        }
+        toast(`${picked.length} bailarín${picked.length === 1 ? '' : 'es'} en ${group.name}`)
+      } else {
+        const category = categories.find(c => c.id === bulkValue)
+        if (!category) throw new Error('Selecciona una categoría')
+        for (const dancer of picked) {
+          await updateDancer(dancer.id, { categoryId: category.id, categoryName: category.name })
+        }
+        toast(`Categoría actualizada para ${picked.length} bailarín${picked.length === 1 ? '' : 'es'}`)
+      }
+      setBulkMode(null)
+      setBulkValue('')
+      setSelected(new Set())
+      await load()
+    } catch (e: any) {
+      toast(e.message ?? 'No se pudo aplicar el cambio', 'error')
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   if (loading) return <PageLoader />
@@ -392,6 +444,21 @@ export default function DancersPage() {
         </div>
       </div>
 
+      {selectMode && (
+        <div className="flex items-center gap-2 flex-wrap rounded-xl px-3 py-2.5"
+          style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+          <span className="text-sm mr-1" style={{ color: 'var(--foreground)' }}>
+            {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => openBulk('group')} style={BTN.edit}>
+            <FolderInput size={14} className="mr-1.5" />Mover a grupo
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => openBulk('category')} style={BTN.refresh}>
+            <Tags size={14} className="mr-1.5" />Pasar a categoría
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-2 md:gap-4">
         {[
           { label: 'Total',     n: dancers.length,                          c: 'var(--gold)' },
@@ -415,7 +482,17 @@ export default function DancersPage() {
             <Table>
               <TableHeader>
                 <TableRow style={{ borderColor: 'var(--border)' }}>
-                  <TableHead className={selectMode ? '' : 'max-md:hidden'} />
+                  <TableHead className={selectMode ? '' : 'max-md:hidden'}>
+                    {selectMode && (
+                      <Checkbox
+                        checked={filtered.length > 0 && filtered.every(d => selected.has(d.id))}
+                        onCheckedChange={v => {
+                          if (v === true) setSelected(new Set(filtered.map(d => d.id)))
+                          else setSelected(new Set())
+                        }}
+                      />
+                    )}
+                  </TableHead>
                   <TableHead className="text-xs uppercase tracking-widest" style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>Bailarín</TableHead>
                   <TableHead className="max-md:hidden text-xs uppercase tracking-widest" style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>Documento</TableHead>
                   <TableHead className="max-md:hidden text-xs uppercase tracking-widest" style={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>Edad</TableHead>
@@ -438,15 +515,15 @@ export default function DancersPage() {
                       )}
                     </TableCell>
                     <TableCell className="min-w-0">
-                      <div className="hidden md:flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Avatar size="sm">
+                          {d.photoUrl && <AvatarImage src={d.photoUrl} alt={d.fullName} />}
                           <AvatarFallback style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '0.75rem', fontWeight: 700 }}>
                             {d.fullName.charAt(0)}
                           </AvatarFallback>
                         </Avatar>
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{d.fullName}</p>
                       </div>
-                      <p className="text-sm font-medium truncate md:hidden" style={{ color: 'var(--foreground)' }}>{d.fullName}</p>
                     </TableCell>
                     <TableCell className="max-md:hidden text-sm" style={{ color: 'var(--muted-foreground)' }}>
                       {d.documentNumber || '—'}
@@ -473,7 +550,6 @@ export default function DancersPage() {
                       <Switch
                         checked={d.isActive}
                         onCheckedChange={() => setDeactivateTarget(d)}
-                        className="data-checked:bg-[#4caf7d]"
                         size="sm"
                       />
                     </TableCell>
@@ -538,14 +614,13 @@ export default function DancersPage() {
 
       {/* Drawer de edición */}
       <Sheet open={!!editing} onOpenChange={v => { if (!v) setEditing(null) }}>
-        <SheetContent side="right"
-          style={{ background: 'rgba(18,18,18,.92)', backdropFilter: 'blur(24px)', overflowY: 'auto', padding: 0 }}>
-          <SheetHeader className="px-6 pt-6 pb-2">
+        <SheetContent wide side="right"
+          style={{ background: 'rgba(18,18,18,.92)', backdropFilter: 'blur(24px)', overflow: 'hidden', padding: 0 }}>
+          <SheetHeader className="shrink-0 px-4 pt-4 pb-1 pr-12">
             <SheetTitle style={{ color: 'var(--foreground)' }}>Editar — {editing?.fullName}</SheetTitle>
           </SheetHeader>
-          <Separator style={{ background: 'var(--border)' }} />
           {editing && (
-            <div className="px-6 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
               <DancerForm
                 compact
                 defaultValues={{
@@ -562,6 +637,7 @@ export default function DancersPage() {
                   phone:          editing.phone,
                   categoryId:     editing.categoryId,
                   notes:          editing.notes,
+                  photoUrl:       editing.photoUrl ?? '',
                 }}
                 onSubmit={handleEditSubmit}
                 submitLabel="Guardar cambios"
@@ -637,6 +713,49 @@ export default function DancersPage() {
               />
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!bulkMode} onOpenChange={v => { if (!v && !bulkSaving) { setBulkMode(null); setBulkValue('') } }}>
+        <SheetContent side="right"
+          style={{ background: 'rgba(18,18,18,.92)', backdropFilter: 'blur(24px)' }}>
+          <SheetHeader>
+            <SheetTitle style={{ color: 'var(--foreground)' }}>
+              {bulkMode === 'group' ? 'Mover a un grupo' : 'Pasar a una categoría'}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pb-6 flex flex-col gap-4">
+            <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+              {selected.size} bailarín{selected.size === 1 ? '' : 'es'} seleccionado{selected.size === 1 ? '' : 's'}.
+              {bulkMode === 'group'
+                ? ' Salen de sus grupos actuales y quedan inscritos en el grupo que elijas.'
+                : ' Se actualiza su categoría. Los grupos no cambian.'}
+            </p>
+            <FormField label={bulkMode === 'group' ? 'Grupo' : 'Categoría'} required>
+              <SaokoCombobox
+                options={bulkMode === 'group'
+                  ? allGroups.map(g => ({
+                      value: g.id,
+                      label: g.name,
+                      description: [g.modalityName, g.categoryName, g.levelName].filter(Boolean).join(' · '),
+                    }))
+                  : categories.map(c => ({ value: c.id, label: c.name }))}
+                value={bulkValue}
+                onValueChange={setBulkValue}
+                placeholder={bulkMode === 'group' ? 'Seleccionar grupo...' : 'Seleccionar categoría...'}
+              />
+            </FormField>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => { setBulkMode(null); setBulkValue('') }} disabled={bulkSaving}
+                style={{ background: 'transparent', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                Cancelar
+              </Button>
+              <Button onClick={applyBulk} disabled={bulkSaving || !bulkValue}
+                style={{ background: 'linear-gradient(135deg,var(--gold-dark),var(--gold))', color: '#000', border: 'none' }}>
+                {bulkSaving ? 'Aplicando...' : 'Aplicar'}
+              </Button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 

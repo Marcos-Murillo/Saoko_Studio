@@ -41,11 +41,13 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  wide = false,
   style,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  wide?: boolean
 }) {
   const docked: React.CSSProperties =
     side === "right" || side === "left"
@@ -55,8 +57,8 @@ function SheetContent({
           bottom: 0,
           height: "100dvh",
           minWidth: 0,
-          width: "min(420px, 100vw)",
-          maxWidth: 420,
+          width: wide ? "50vw" : "min(420px, 100vw)",
+          maxWidth: wide ? "50vw" : 420,
           ...(side === "right" ? { right: 0, left: "auto" } : { left: 0, right: "auto" }),
         }
       : { position: "fixed" }
@@ -67,6 +69,7 @@ function SheetContent({
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         data-side={side}
+        data-wide={wide ? "true" : undefined}
         className={cn(
           "saoko-drawer fixed z-50 flex flex-col gap-4 overflow-hidden bg-transparent bg-clip-padding text-sm text-popover-foreground transition duration-200 ease-in-out data-ending-style:opacity-0 data-starting-style:opacity-0",
           side === "right" && "inset-y-0 right-0 top-0 h-dvh w-[min(420px,100vw)] data-ending-style:translate-x-[2.5rem] data-starting-style:translate-x-[2.5rem] max-md:data-ending-style:translate-x-0 max-md:data-starting-style:translate-x-0 max-md:data-ending-style:translate-y-[2.5rem] max-md:data-starting-style:translate-y-[2.5rem]",

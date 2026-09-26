@@ -149,7 +149,6 @@ export default function GroupsPage() {
                             toast(v ? 'Grupo activado' : 'Grupo desactivado')
                             load()
                           }}
-                          className="data-checked:bg-[#4caf7d]"
                           size="sm"
                         />
                       </>

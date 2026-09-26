@@ -12,7 +12,3 @@ export function uploadReceipt(file: File): Promise<string> {
   return uploadFile(`receipts/${Date.now()}-${safe}`, file)
 }
 
-export function uploadDancerPhoto(dancerId: string, file: File): Promise<string> {
-  const ext = file.name.split('.').pop() || 'jpg'
-  return uploadFile(`dancer-photos/${dancerId}/photo.${ext}`, file)
-}

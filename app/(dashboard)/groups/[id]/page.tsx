@@ -86,7 +86,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center gap-3 mb-2">
               <h2 style={{ color: 'var(--text-primary)', fontSize: '1.35rem', fontWeight: 700 }}>{group.name}</h2>
               {canWrite ? (
-                <Switch checked={group.isActive} onCheckedChange={toggleActive} className="data-checked:bg-[#4caf7d]" />
+                <Switch checked={group.isActive} onCheckedChange={toggleActive} />
               ) : (
                 <ActiveBadge isActive={group.isActive} />
               )}

@@ -512,7 +512,6 @@ export default function SchedulesPage() {
                                 toast(v ? 'Horario activado' : 'Horario desactivado')
                                 load()
                               }}
-                              className="data-checked:bg-[#4caf7d]"
                               size="sm"
                             />
                           </div>

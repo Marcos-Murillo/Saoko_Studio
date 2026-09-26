@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/lib/auth/AuthContext'
-import { uploadDancerPhoto } from '@/lib/firebase/storage'
+import { uploadToImgbb } from '@/lib/imgbb'
 import { downloadSimplePdf } from '@/lib/utils/exportPdf'
 import { downloadXlsx } from '@/lib/utils/exportExcel'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -104,7 +104,6 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                   <Switch
                     checked={dancer.isActive}
                     onCheckedChange={() => setConfirm(true)}
-                    className="data-checked:bg-[#4caf7d]"
                   />
                   {dancer.categoryName && (
                     <Badge variant="outline" style={{ fontSize: '0.72rem', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
@@ -136,7 +135,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                   const file = e.target.files?.[0]
                   if (!file) return
                   try {
-                    const url = await uploadDancerPhoto(id, file)
+                    const url = await uploadToImgbb(file)
                     await updateDancer(id, { photoUrl: url })
                     toast('Foto actualizada')
                     load()

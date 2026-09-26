@@ -110,6 +110,14 @@
   height: 100dvh !important;
 }
 
+@media (min-width: 768px) {
+  [data-slot="sheet-content"][data-side="right"][data-wide="true"] {
+    width: 50vw !important;
+    max-width: 50vw !important;
+    min-width: 50vw !important;
+  }
+}
+
 .kpi-card {
   border-radius: 1rem;
   padding: 1.15rem 1.25rem;

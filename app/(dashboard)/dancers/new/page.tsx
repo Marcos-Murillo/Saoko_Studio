@@ -24,17 +24,17 @@ export default function NewDancerPage() {
       phone: data.phone, categoryId: data.categoryId,
       categoryName: cat?.name ?? '', isActive: true,
       inactiveDate: null, notes: data.notes,
-      currentGroupId: null, currentGroupName: null, photoUrl: null,
+      currentGroupId: null, currentGroupName: null, photoUrl: data.photoUrl || null,
     })
     toast('Bailarín creado correctamente')
     router.push(`/dancers/${id}`)
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title="Nuevo Bailarín"
-        description="Completa la información del bailarín. Los campos marcados con * son obligatorios."
+        description="Los campos marcados con * son obligatorios. La foto no lo es."
       />
       <DancerForm onSubmit={handleSubmit} submitLabel="Crear Bailarín" />
     </div>

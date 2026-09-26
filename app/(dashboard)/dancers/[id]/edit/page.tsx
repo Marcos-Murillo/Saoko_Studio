@@ -41,6 +41,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
         categoryId: data.categoryId,
         categoryName: cat?.name ?? '',
         notes: data.notes,
+        photoUrl: data.photoUrl || null,
       })
       toast('Bailarín actualizado correctamente')
       router.push(`/dancers/${id}`)
@@ -57,8 +58,8 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
     : ''
 
   return (
-    <div className="max-w-3xl">
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: 24 }}>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm shrink-0" style={{ color: 'var(--muted-foreground)' }}>
         Editando información de <strong style={{ color: 'var(--text-primary)' }}>{dancer.fullName}</strong>
       </p>
       <DancerForm
@@ -76,6 +77,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
           phone: dancer.phone,
           categoryId: dancer.categoryId,
           notes: dancer.notes,
+          photoUrl: dancer.photoUrl ?? '',
         }}
         onSubmit={handleSubmit}
         submitLabel="Guardar cambios"
