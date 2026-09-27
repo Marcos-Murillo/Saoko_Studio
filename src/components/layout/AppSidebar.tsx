@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LogOut, Music, ChevronLeft,
+  LogOut, ChevronLeft,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
@@ -35,12 +35,11 @@ export function AppSidebar() {
       }}
     >
       <div className={cn('flex items-center gap-3 px-4 py-6', collapsed && 'justify-center px-2')}>
-        <div
-          className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--gold-dark), var(--gold))' }}
-        >
-          <Music size={17} color="#000" />
-        </div>
+        <img
+          src="/LOGOS/N%20SIN%20FONDO.png"
+          alt="Nexora"
+          className="h-9 w-auto shrink-0"
+        />
         {!collapsed && (
           <div className="leading-none min-w-0">
             <p className="font-bold text-[0.95rem] truncate" style={{ color: 'var(--gold)' }}>Saoko</p>

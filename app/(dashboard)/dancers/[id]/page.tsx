@@ -143,7 +143,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                 }} />
               </label>
               <Button variant="outline" size="sm" onClick={() => {
-                downloadSimplePdf(`ficha-${dancer.documentNumber || dancer.id}`, dancer.fullName, [
+                void downloadSimplePdf(`ficha-${dancer.documentNumber || dancer.id}`, dancer.fullName, [
                   `Documento: ${dancer.documentNumber}`,
                   `Nacimiento: ${formatDate(dancer.birthDate)} · ${getAge(dancer.birthDate)} años`,
                   `Teléfono: ${dancer.phone || '—'} · Correo: ${dancer.email || '—'}`,

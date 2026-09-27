@@ -7,8 +7,12 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: 'Saoko Estudio & Dance Company',
+  title: 'NEXORA',
   description: 'Sistema Administrativo — Saoko Estudio & Dance Company',
+  icons: {
+    icon: '/LOGOS/N%20SIN%20FONDO.png',
+    apple: '/LOGOS/N%20SIN%20FONDO.png',
+  },
   appleWebApp: {
     capable: true,
     title: 'Saoko',

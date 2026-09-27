@@ -7,7 +7,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { MobileTabBar } from '@/components/layout/MobileTabBar'
 import { ToastProvider } from '@/components/shared/Toast'
-import { PageLoader } from '@/components/shared/LoadingSpinner'
+import { BrandLoader } from '@/components/shared/LoadingSpinner'
 import { SetPasswordForm } from '@/components/auth/SetPasswordForm'
 import { ensureCurrentMonthFees } from '@/lib/services/fee.service'
 
@@ -25,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ensureCurrentMonthFees({ id: adminUser.id, name: adminUser.name }).catch(() => {})
   }, [adminUser])
 
-  if (loading) return <PageLoader />
+  if (loading) return <BrandLoader />
   if (!user) return null
   if (adminUser?.mustSetPassword) {
     return (

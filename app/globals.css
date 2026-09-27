@@ -221,7 +221,7 @@
     border-radius: 24px 24px 0 0 !important;
     border: 1px solid var(--glass-border) !important;
     border-bottom: none !important;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: calc(6.75rem + env(safe-area-inset-bottom)) !important;
   }
 
   [data-slot="sheet-content"][data-side="right"]::before,

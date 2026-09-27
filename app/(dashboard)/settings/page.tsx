@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Music, Tag, Layers, CreditCard, ReceiptText, Users } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { Card, CardContent } from '@/components/ui/card'
+import { LetterheadCard } from '@/components/settings/LetterheadCard'
 
 const SECTIONS = [
   { href: '/settings/modalities',        icon: Music,        label: 'Modalidades',           desc: 'Salsa Caleña, Jazz, Ballet, Contemporánea...' },
@@ -22,6 +23,7 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <LetterheadCard />
         {SECTIONS.map(({ href, icon: Icon, label, desc }) => (
           <Link key={href} href={href} style={{ textDecoration: 'none' }}>
             <Card

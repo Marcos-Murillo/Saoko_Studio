@@ -9,6 +9,7 @@ export const COLLECTIONS = {
   LEVELS: 'levels',
   PAYMENT_METHODS: 'paymentMethods',
   EXPENSE_CATEGORIES: 'expenseCategories',
+  APP_SETTINGS: 'appSettings',
 
   // People
   ADMIN_USERS: 'adminUsers',

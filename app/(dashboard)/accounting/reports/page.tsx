@@ -115,7 +115,7 @@ export default function ReportsPage() {
   }
 
   const exportPdf = () => {
-    downloadMultiTablePdf(`reporte-${from}_${to}`, `Reporte ${periodLabel}`, [
+    void downloadMultiTablePdf(`reporte-${from}_${to}`, `Reporte ${periodLabel}`, [
       `Caja (ingresos): ${formatCurrency(cashIncome)}`,
       `Devengo de cuotas: ${formatCurrency(accrual)}`,
       `Gastos: ${formatCurrency(totalExpense)}`,

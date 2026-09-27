@@ -183,6 +183,11 @@ service cloud.firestore {
       allow read, write: if isOps();
     }
 
+    match /appSettings/{id} {
+      allow read: if isOps();
+      allow write: if isAdmin();
+    }
+
     match /auditLogs/{id} {
       allow read: if isAdmin();
       allow create: if isOps();
