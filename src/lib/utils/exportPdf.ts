@@ -1,4 +1,4 @@
-import { jsPDF } from 'jspdf'
+import { GState, jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { getLetterhead } from '@/lib/services/branding.service'
 
@@ -46,7 +46,7 @@ function paintLetterhead(doc: jsPDF, image: Letterhead | null) {
   const band = headerBand(doc, image)
 
   doc.saveGraphicsState()
-  doc.setGState(new doc.GState({ opacity: 0.12 }))
+  doc.setGState(new GState({ opacity: 0.12 }))
   const markW = pageW * 0.58
   const markH = markW * ratio
   doc.addImage(
