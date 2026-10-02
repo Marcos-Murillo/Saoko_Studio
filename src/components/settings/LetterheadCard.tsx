@@ -1,22 +1,37 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ImagePlus } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { FileUpload } from '@/components/ui/file-upload'
 import { useToast } from '@/components/shared/Toast'
-import { compressLetterhead, getLetterhead, saveLetterhead } from '@/lib/services/branding.service'
+import {
+  compressLetterhead,
+  getLetterheadParts,
+  saveLetterheadParts,
+  type LetterheadParts,
+} from '@/lib/services/branding.service'
+
+const EMPTY: LetterheadParts = { header: null, center: null, footer: null }
+const PART_MAX = 280_000
+
+const SLOTS: { key: keyof LetterheadParts; label: string; hint: string }[] = [
+  { key: 'header', label: 'Cabecera', hint: 'Arriba de la hoja' },
+  { key: 'center', label: 'Centro', hint: 'Logo en la mitad' },
+  { key: 'footer', label: 'Pie', hint: 'Abajo de la hoja' },
+]
 
 export function LetterheadCard() {
   const toast = useToast()
   const [open, setOpen] = useState(false)
-  const [current, setCurrent] = useState<string | null>(null)
-  const [draft, setDraft] = useState<string | null>(null)
+  const [current, setCurrent] = useState<LetterheadParts>(EMPTY)
+  const [draft, setDraft] = useState<LetterheadParts>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState<keyof LetterheadParts | null>(null)
+  const inputs = useRef<Partial<Record<keyof LetterheadParts, HTMLInputElement | null>>>({})
 
   useEffect(() => {
-    getLetterhead()
+    getLetterheadParts()
       .then(value => {
         setCurrent(value)
         setDraft(value)
@@ -25,7 +40,7 @@ export function LetterheadCard() {
       .finally(() => setLoading(false))
   }, [toast])
 
-  const onFile = async (file: File | undefined) => {
+  const onFile = async (key: keyof LetterheadParts, file: File | undefined) => {
     if (!file) return
     if (!file.type.startsWith('image/')) {
       toast('Elige una imagen PNG o JPG', 'error')
@@ -35,27 +50,32 @@ export function LetterheadCard() {
       toast('La imagen supera 8 MB', 'error')
       return
     }
+    setBusy(key)
     try {
-      setDraft(await compressLetterhead(file))
+      const dataUrl = await compressLetterhead(file, PART_MAX)
+      setDraft(prev => ({ ...prev, [key]: dataUrl }))
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : 'No se pudo preparar la imagen', 'error')
+    } finally {
+      setBusy(null)
     }
   }
 
   const save = async () => {
     setSaving(true)
     try {
-      await saveLetterhead(draft)
+      await saveLetterheadParts(draft)
       setCurrent(draft)
-      toast(draft ? 'Membrete guardado' : 'Membrete quitado')
-    } catch {
-      toast('No se pudo guardar el membrete', 'error')
+      toast('Membrete guardado')
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'No se pudo guardar el membrete', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const dirty = draft !== current
+  const dirty = draft.header !== current.header || draft.center !== current.center || draft.footer !== current.footer
+  const ready = SLOTS.filter(slot => current[slot.key]).map(slot => slot.label)
 
   return (
     <Card
@@ -78,7 +98,7 @@ export function LetterheadCard() {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Membrete del PDF</p>
           <p className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
-            Imagen del encabezado en los reportes
+            {ready.length ? ready.join(' · ') : 'Cabecera, logo central y pie de página'}
           </p>
         </div>
         <ChevronDown
@@ -97,34 +117,74 @@ export function LetterheadCard() {
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Cargando membrete...</p>
           ) : (
             <>
-              <FileUpload onChange={files => { void onFile(files[0]) }} previewUrl={draft} />
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {SLOTS.map(slot => {
+                  const value = draft[slot.key]
+                  return (
+                    <div key={slot.key} className="flex flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>{slot.label}</p>
+                        <p className="text-[0.65rem]" style={{ color: 'var(--muted-foreground)' }}>{slot.hint}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => inputs.current[slot.key]?.click()}
+                        className="flex h-24 w-full items-center justify-center overflow-hidden rounded-xl"
+                        style={{
+                          background: 'var(--accent)',
+                          border: '1px dashed var(--border)',
+                          cursor: 'pointer',
+                          padding: 8,
+                        }}
+                      >
+                        {value ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={value} alt={slot.label} className="max-h-full max-w-full object-contain" />
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                            {busy === slot.key ? 'Preparando...' : 'Elegir imagen'}
+                          </span>
+                        )}
+                      </button>
+                      <input
+                        ref={node => { inputs.current[slot.key] = node }}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => {
+                          void onFile(slot.key, e.target.files?.[0])
+                          e.target.value = ''
+                        }}
+                      />
+                      {value && (
+                        <button
+                          type="button"
+                          className="self-start text-[0.68rem]"
+                          style={{ color: '#e05252', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          onClick={() => setDraft(prev => ({ ...prev, [slot.key]: null }))}
+                        >
+                          Quitar
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="flex justify-end">
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!dirty || saving}
+                  disabled={!dirty || saving || busy !== null}
                   onClick={() => void save()}
                   style={{
                     background: 'linear-gradient(135deg, var(--gold-dark), var(--gold))',
                     color: '#000',
                     border: 'none',
-                    opacity: !dirty || saving ? 0.6 : 1,
+                    opacity: !dirty || saving || busy !== null ? 0.6 : 1,
                   }}
                 >
-                  {saving ? 'Guardando...' : draft ? 'Guardar membrete' : 'Quitar membrete'}
+                  {saving ? 'Guardando...' : 'Guardar membrete'}
                 </Button>
-                {draft && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => setDraft(null)}
-                    style={{ background: 'transparent', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}
-                  >
-                    Quitar
-                  </Button>
-                )}
               </div>
             </>
           )}
