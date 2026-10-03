@@ -1,18 +1,11 @@
-'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth/AuthContext'
-import { BrandLoader } from '@/components/shared/LoadingSpinner'
+import type { Metadata } from 'next'
+import { LandingPage } from '@/components/landing/LandingPage'
 
-export default function RootPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+export const metadata: Metadata = {
+  title: 'Nexora — La gestión de tu academia',
+  description: 'Panel de Saoko Estudio: bailarines, grupos, horarios, caja, vestuario y eventos.',
+}
 
-  useEffect(() => {
-    if (!loading) {
-      router.replace(user ? '/dashboard' : '/login')
-    }
-  }, [user, loading, router])
-
-  return <BrandLoader />
+export default function Page() {
+  return <LandingPage />
 }
