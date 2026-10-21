@@ -7,9 +7,10 @@ import { getCategories } from '@/lib/services/catalog.service'
 import { DancerForm, type DancerFormData } from '@/components/dancers/DancerForm'
 import { useToast } from '@/components/shared/Toast'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import { isoToTs, tsToDate } from '@/lib/utils/dates'
+import { isoToTs } from '@/lib/utils/dates'
+import { packDancerCategories, readCategoryIds } from '@/lib/utils/dancerCategories'
 import { format } from 'date-fns'
-import type { Dancer, BloodType } from '@/types'
+import type { Dancer, BloodType, Gender } from '@/types'
 
 export default function EditDancerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -25,7 +26,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
   const handleSubmit = async (data: DancerFormData) => {
     try {
       const cats = await getCategories(false)
-      const cat = cats.find(c => c.id === data.categoryId)
+      const categories = packDancerCategories(cats, data.categoryIds)
       await updateDancer(id, {
         fullName: data.fullName,
         documentNumber: data.documentNumber,
@@ -33,13 +34,14 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
         address: data.address,
         neighborhood: data.neighborhood,
         commune: data.commune,
+        city: data.city,
+        gender: (data.gender || '') as Gender,
         eps: data.eps,
         epsLocation: data.epsLocation,
         bloodType: data.bloodType as BloodType,
         email: data.email,
         phone: data.phone,
-        categoryId: data.categoryId,
-        categoryName: cat?.name ?? '',
+        ...categories,
         notes: data.notes,
         photoUrl: data.photoUrl || null,
       })
@@ -75,7 +77,9 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
           bloodType: dancer.bloodType,
           email: dancer.email,
           phone: dancer.phone,
-          categoryId: dancer.categoryId,
+          city: dancer.city ?? '',
+          gender: dancer.gender ?? '',
+          categoryIds: readCategoryIds(dancer),
           notes: dancer.notes,
           photoUrl: dancer.photoUrl ?? '',
         }}

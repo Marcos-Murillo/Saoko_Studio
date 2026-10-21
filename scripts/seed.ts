@@ -61,6 +61,7 @@ async function seedCategories() {
     { id: 'pre-juvenil', name: 'Pre-juvenil', description: 'Niños y niñas en etapa intermedia (9–12 años)', minAge: 9, maxAge: 12, isActive: true, sortOrder: 2 },
     { id: 'juvenil', name: 'Juvenil', description: 'Jóvenes (13–17 años)', minAge: 13, maxAge: 17, isActive: true, sortOrder: 3 },
     { id: 'adulto', name: 'Adulto', description: 'Adultos (18 años en adelante)', minAge: 18, maxAge: null, isActive: true, sortOrder: 4 },
+    { id: 'doble-proceso', name: 'Doble Proceso', description: 'Bailarín de Primera Línea que también está en Segunda Línea. Se suma a su otra categoría.', minAge: null, maxAge: null, isActive: true, sortOrder: 5 },
   ]
   for (const item of items) await upsert('categories', item.id, item)
 }

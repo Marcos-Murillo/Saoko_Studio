@@ -89,6 +89,7 @@ export interface DancerGuardian extends BaseEntity {
 // Dancers (Bailarines)
 // ─────────────────────────────────────────────
 export type BloodType = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-'
+export type Gender = 'Femenino' | 'Masculino' | ''
 
 export interface Dancer extends BaseEntity {
   fullName: string
@@ -97,13 +98,18 @@ export interface Dancer extends BaseEntity {
   address: string
   neighborhood: string
   commune: string
+  city?: string
+  gender?: Gender
   eps: string
   epsLocation: string
   bloodType: BloodType | ''
   email: string
   phone: string
+  /** Primera categoría, para registros anteriores a las categorías múltiples */
   categoryId: string
-  categoryName?: string    // denormalized
+  categoryName?: string
+  categoryIds?: string[]
+  categoryNames?: string[]
   isActive: boolean
   inactiveDate: Timestamp | null
   notes: string

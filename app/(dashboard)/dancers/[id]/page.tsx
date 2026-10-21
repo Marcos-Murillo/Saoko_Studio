@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useToast } from '@/components/shared/Toast'
 import { formatDate, getAge } from '@/lib/utils/dates'
+import { readCategoryNames } from '@/lib/utils/dancerCategories'
 import { formatCurrency } from '@/lib/utils/currency'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -20,7 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/lib/auth/AuthContext'
-import { uploadToImgbb } from '@/lib/imgbb'
+import { compressLetterhead } from '@/lib/services/branding.service'
+import { PhotoLightbox } from '@/components/dancers/PhotoLightbox'
 import { downloadSimplePdf } from '@/lib/utils/exportPdf'
 import { downloadXlsx } from '@/lib/utils/exportExcel'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -90,13 +92,15 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
         <CardContent className="p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-5">
-              <Avatar style={{ width: 64, height: 64 }}>
-                {dancer.photoUrl && <AvatarImage src={dancer.photoUrl} alt={dancer.fullName} />}
-                <AvatarFallback
-                  style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '1.5rem', fontWeight: 700 }}>
-                  {dancer.fullName.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
+              <PhotoLightbox src={dancer.photoUrl} alt={dancer.fullName}>
+                <Avatar style={{ width: 64, height: 64 }}>
+                  {dancer.photoUrl && <AvatarImage src={dancer.photoUrl} alt={dancer.fullName} />}
+                  <AvatarFallback
+                    style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '1.5rem', fontWeight: 700 }}>
+                    {dancer.fullName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+              </PhotoLightbox>
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>{dancer.fullName}</h2>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -105,11 +109,11 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                     checked={dancer.isActive}
                     onCheckedChange={() => setConfirm(true)}
                   />
-                  {dancer.categoryName && (
-                    <Badge variant="outline" style={{ fontSize: '0.72rem', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
-                      {dancer.categoryName}
+                  {readCategoryNames(dancer).map(name => (
+                    <Badge key={name} variant="outline" style={{ fontSize: '0.72rem', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                      {name}
                     </Badge>
-                  )}
+                  ))}
                   {dancer.birthDate && (
                     <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{getAge(dancer.birthDate)} años</span>
                   )}
@@ -135,17 +139,19 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                   const file = e.target.files?.[0]
                   if (!file) return
                   try {
-                    const url = await uploadToImgbb(file)
+                    const url = await compressLetterhead(file)
                     await updateDancer(id, { photoUrl: url })
                     toast('Foto actualizada')
                     load()
-                  } catch { toast('No se pudo subir la foto', 'error') }
+                  } catch (err) { toast(err instanceof Error ? err.message : 'No se pudo guardar la foto', 'error') }
                 }} />
               </label>
               <Button variant="outline" size="sm" onClick={() => {
                 void downloadSimplePdf(`ficha-${dancer.documentNumber || dancer.id}`, dancer.fullName, [
                   `Documento: ${dancer.documentNumber}`,
                   `Nacimiento: ${formatDate(dancer.birthDate)} · ${getAge(dancer.birthDate)} años`,
+                  `Ciudad: ${dancer.city || '—'} · Género: ${dancer.gender || '—'}`,
+                  `Categorías: ${readCategoryNames(dancer).join(', ') || '—'}`,
                   `Teléfono: ${dancer.phone || '—'} · Correo: ${dancer.email || '—'}`,
                   `Dirección: ${dancer.address || '—'} · ${dancer.neighborhood || ''} · Comuna ${dancer.commune || '—'}`,
                   `EPS: ${dancer.eps || '—'} · RH: ${dancer.bloodType || '—'}`,
@@ -158,7 +164,9 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
               </Button>
               <Button variant="outline" size="sm" onClick={() => downloadXlsx(`ficha-${dancer.documentNumber || dancer.id}`, [{
                 Nombre: dancer.fullName, Documento: dancer.documentNumber, Telefono: dancer.phone,
-                Correo: dancer.email, Grupos: current.map(m => m.groupName).join(', '),
+                Correo: dancer.email, Ciudad: dancer.city ?? '', Genero: dancer.gender ?? '',
+                Categorias: readCategoryNames(dancer).join(', '),
+                Grupos: current.map(m => m.groupName).join(', '),
                 EPS: dancer.eps, RH: dancer.bloodType,
               }])} style={BTN.excel}>
                 Excel
@@ -182,6 +190,9 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
           <CardContent className="pt-4">
             <InfoRow icon={Calendar} label="Cédula"              value={dancer.documentNumber} />
             <InfoRow icon={Calendar} label="Fecha de nacimiento" value={formatDate(dancer.birthDate)} />
+            <InfoRow icon={Calendar} label="Género"              value={dancer.gender} />
+            <InfoRow icon={MapPin}   label="Ciudad"              value={dancer.city} />
+            <InfoRow icon={Calendar} label="Categorías"          value={readCategoryNames(dancer).join(', ')} />
             <InfoRow icon={Phone}    label="Teléfono"            value={dancer.phone} />
             <InfoRow icon={Mail}     label="Correo"              value={dancer.email} />
             <InfoRow icon={MapPin}   label="Dirección"           value={dancer.address} />

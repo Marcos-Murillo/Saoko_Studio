@@ -6,7 +6,8 @@ import { DancerForm, type DancerFormData } from '@/components/dancers/DancerForm
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useToast } from '@/components/shared/Toast'
 import { isoToTs } from '@/lib/utils/dates'
-import type { BloodType } from '@/types'
+import { packDancerCategories } from '@/lib/utils/dancerCategories'
+import type { BloodType, Gender } from '@/types'
 
 export default function NewDancerPage() {
   const router = useRouter()
@@ -14,15 +15,15 @@ export default function NewDancerPage() {
 
   const handleSubmit = async (data: DancerFormData) => {
     const cats = await getCategories(false)
-    const cat  = cats.find(c => c.id === data.categoryId)
+    const categories = packDancerCategories(cats, data.categoryIds)
     const id   = await createDancer({
       fullName: data.fullName, documentNumber: data.documentNumber,
       birthDate: isoToTs(data.birthDate), address: data.address,
       neighborhood: data.neighborhood, commune: data.commune,
+      city: data.city, gender: (data.gender || '') as Gender,
       eps: data.eps, epsLocation: data.epsLocation,
       bloodType: data.bloodType as BloodType, email: data.email,
-      phone: data.phone, categoryId: data.categoryId,
-      categoryName: cat?.name ?? '', isActive: true,
+      phone: data.phone, ...categories, isActive: true,
       inactiveDate: null, notes: data.notes,
       currentGroupId: null, currentGroupName: null, photoUrl: data.photoUrl || null,
     })

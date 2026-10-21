@@ -23,6 +23,7 @@ import { useToast } from '@/components/shared/Toast'
 import { FormField } from '@/components/shared/FormField'
 import { SaokoCombobox } from '@/components/shared/SaokoCombobox'
 import { formatDate, getAge, currentYearMonth, MONTHS_ES } from '@/lib/utils/dates'
+import { mergeCategory, packDancerCategories, readCategoryIds, readCategoryNames } from '@/lib/utils/dancerCategories'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -36,11 +37,12 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DancerForm, type DancerFormData } from '@/components/dancers/DancerForm'
+import { PhotoLightbox } from '@/components/dancers/PhotoLightbox'
 import { DancerProfilePanel } from '@/components/dancers/DancerProfilePanel'
 import { DancerFinancialPanel } from '@/components/dancers/DancerFinancialPanel'
 import { isoToTs } from '@/lib/utils/dates'
 import { downloadXlsx } from '@/lib/utils/exportExcel'
-import type { Dancer, BloodType, Group, GroupMembership, PaymentMethod, MonthlyFee, Category } from '@/types'
+import type { Dancer, BloodType, Gender, Group, GroupMembership, PaymentMethod, MonthlyFee, Category } from '@/types'
 
 const { month: CURRENT_MONTH } = currentYearMonth()
 
@@ -279,15 +281,15 @@ export default function DancersPage() {
   const handleEditSubmit = async (data: DancerFormData) => {
     if (!editing) return
     const cats = await getCategories(false)
-    const cat  = cats.find(c => c.id === data.categoryId)
+    const categories = packDancerCategories(cats, data.categoryIds)
     await updateDancer(editing.id, {
       fullName: data.fullName, documentNumber: data.documentNumber,
       birthDate: isoToTs(data.birthDate), address: data.address,
       neighborhood: data.neighborhood, commune: data.commune,
+      city: data.city, gender: (data.gender || '') as Gender,
       eps: data.eps, epsLocation: data.epsLocation,
       bloodType: data.bloodType as BloodType, email: data.email,
-      phone: data.phone, categoryId: data.categoryId,
-      categoryName: cat?.name ?? '', notes: data.notes,
+      phone: data.phone, ...categories, notes: data.notes,
       photoUrl: data.photoUrl || null,
     })
     toast('Bailarín actualizado')
@@ -313,7 +315,9 @@ export default function DancersPage() {
     Nombre: d.fullName,
     Documento: d.documentNumber,
     Edad: d.birthDate ? getAge(d.birthDate) : '',
-    Categoria: d.categoryName ?? '',
+    Categoria: readCategoryNames(d).join(', '),
+    Ciudad: d.city ?? '',
+    Genero: d.gender ?? '',
     Grupos: d.currentGroupName ?? '',
     MesPagado: payStatusByDancer[d.id] === 'paid' ? 'Si' : payStatusByDancer[d.id] === 'partial' ? 'Parcial' : payStatusByDancer[d.id] === 'pending' ? 'No' : '',
     Estado: d.isActive ? 'Activo' : 'Inactivo',
@@ -373,9 +377,9 @@ export default function DancersPage() {
         const category = categories.find(c => c.id === bulkValue)
         if (!category) throw new Error('Selecciona una categoría')
         for (const dancer of picked) {
-          await updateDancer(dancer.id, { categoryId: category.id, categoryName: category.name })
+          await updateDancer(dancer.id, mergeCategory(categories, readCategoryIds(dancer), category.id))
         }
-        toast(`Categoría actualizada para ${picked.length} bailarín${picked.length === 1 ? '' : 'es'}`)
+        toast(`Categoría añadida a ${picked.length} bailarín${picked.length === 1 ? '' : 'es'}`)
       }
       setBulkMode(null)
       setBulkValue('')
@@ -454,7 +458,7 @@ export default function DancersPage() {
             <FolderInput size={14} className="mr-1.5" />Mover a grupo
           </Button>
           <Button variant="outline" size="sm" onClick={() => openBulk('category')} style={BTN.refresh}>
-            <Tags size={14} className="mr-1.5" />Pasar a categoría
+            <Tags size={14} className="mr-1.5" />Añadir categoría
           </Button>
         </div>
       )}
@@ -516,12 +520,14 @@ export default function DancersPage() {
                     </TableCell>
                     <TableCell className="min-w-0">
                       <div className="flex items-center gap-3 min-w-0">
-                        <Avatar size="sm">
-                          {d.photoUrl && <AvatarImage src={d.photoUrl} alt={d.fullName} />}
-                          <AvatarFallback style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '0.75rem', fontWeight: 700 }}>
-                            {d.fullName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <PhotoLightbox src={d.photoUrl} alt={d.fullName}>
+                          <Avatar size="sm">
+                            {d.photoUrl && <AvatarImage src={d.photoUrl} alt={d.fullName} />}
+                            <AvatarFallback style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', fontSize: '0.75rem', fontWeight: 700 }}>
+                              {d.fullName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </PhotoLightbox>
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--foreground)' }}>{d.fullName}</p>
                       </div>
                     </TableCell>
@@ -532,8 +538,12 @@ export default function DancersPage() {
                       {d.birthDate ? `${getAge(d.birthDate)} años` : '—'}
                     </TableCell>
                     <TableCell className="max-md:hidden">
-                      {d.categoryName
-                        ? <Badge variant="outline" style={{ fontSize: '0.72rem', color: 'var(--foreground)', borderColor: 'var(--border)' }}>{d.categoryName}</Badge>
+                      {readCategoryNames(d).length > 0
+                        ? <div className="flex flex-wrap gap-1">
+                            {readCategoryNames(d).map(name => (
+                              <Badge key={name} variant="outline" style={{ fontSize: '0.72rem', color: 'var(--foreground)', borderColor: 'var(--border)' }}>{name}</Badge>
+                            ))}
+                          </div>
                         : <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>—</span>}
                     </TableCell>
                     <TableCell className="max-md:hidden">
@@ -635,7 +645,9 @@ export default function DancersPage() {
                   bloodType:      editing.bloodType,
                   email:          editing.email,
                   phone:          editing.phone,
-                  categoryId:     editing.categoryId,
+                  city:           editing.city ?? '',
+                  gender:         editing.gender ?? '',
+                  categoryIds:    readCategoryIds(editing),
                   notes:          editing.notes,
                   photoUrl:       editing.photoUrl ?? '',
                 }}
@@ -721,7 +733,7 @@ export default function DancersPage() {
           style={{ background: 'rgba(18,18,18,.92)', backdropFilter: 'blur(24px)' }}>
           <SheetHeader>
             <SheetTitle style={{ color: 'var(--foreground)' }}>
-              {bulkMode === 'group' ? 'Mover a un grupo' : 'Pasar a una categoría'}
+              {bulkMode === 'group' ? 'Mover a un grupo' : 'Añadir categoría'}
             </SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6 flex flex-col gap-4">
@@ -729,7 +741,7 @@ export default function DancersPage() {
               {selected.size} bailarín{selected.size === 1 ? '' : 'es'} seleccionado{selected.size === 1 ? '' : 's'}.
               {bulkMode === 'group'
                 ? ' Salen de sus grupos actuales y quedan inscritos en el grupo que elijas.'
-                : ' Se actualiza su categoría. Los grupos no cambian.'}
+                : ' Se suma a las categorías que ya tiene. No quita las anteriores ni cambia sus grupos.'}
             </p>
             <FormField label={bulkMode === 'group' ? 'Grupo' : 'Categoría'} required>
               <SaokoCombobox

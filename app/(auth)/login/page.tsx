@@ -1,10 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { Input } from '@/components/ui/input'
 import { SetPasswordForm } from '@/components/auth/SetPasswordForm'
@@ -306,6 +307,19 @@ export default function LoginPage() {
             </button>
           </form>
         )}
+
+        <Link
+          href="/"
+          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold transition-opacity hover:opacity-80"
+          style={{
+            color: 'var(--foreground)',
+            border: '1px solid rgba(240, 234, 214, 0.28)',
+            background: 'transparent',
+          }}
+        >
+          <ArrowLeft size={15} />
+          Volver al inicio
+        </Link>
       </div>
       </div>
     </div>

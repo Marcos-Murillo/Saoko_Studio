@@ -11,8 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { FormField } from '@/components/shared/FormField'
 import { SaokoCombobox } from '@/components/shared/SaokoCombobox'
 import { DatePicker } from '@/components/shared/DatePicker'
+import { Checkbox } from '@/components/ui/checkbox'
 import { FileUpload } from '@/components/ui/file-upload'
-import { uploadToImgbb } from '@/lib/imgbb'
+import { PhotoLightbox } from '@/components/dancers/PhotoLightbox'
+import { compressLetterhead } from '@/lib/services/branding.service'
 import type { Category, BloodType } from '@/types'
 
 const schema = z.object({
@@ -27,7 +29,9 @@ const schema = z.object({
   bloodType:      z.string().optional().default(''),
   email:          z.string().optional().default(''),
   phone:          z.string().optional().default(''),
-  categoryId:     z.string().min(1, 'Categoría requerida'),
+  city:           z.string().optional().default(''),
+  gender:         z.string().optional().default(''),
+  categoryIds:    z.array(z.string()).min(1, 'Selecciona al menos una categoría'),
   notes:          z.string().optional().default(''),
   photoUrl:       z.string().optional().default(''),
 })
@@ -35,6 +39,10 @@ export type DancerFormData = z.infer<typeof schema>
 
 /* ─── Opciones estáticas (no se gestionan en catálogo de Firestore) ──────── */
 const BLOOD_TYPES: BloodType[] = ['A+','A-','B+','B-','AB+','AB-','O+','O-']
+const GENDERS = [
+  { value: 'Femenino', label: 'Femenino' },
+  { value: 'Masculino', label: 'Masculino' },
+]
 const COMMUNES = Array.from({ length: 22 }, (_, i) => ({
   value: String(i + 1),
   label: `Comuna ${i + 1}`,
@@ -78,7 +86,7 @@ export function DancerForm({
     defaultValues: {
       fullName: '', documentNumber: '', birthDate: '', address: '',
       neighborhood: '', commune: '', eps: '', epsLocation: '', bloodType: '',
-      email: '', phone: '', categoryId: '', notes: '', photoUrl: '', ...defaultValues,
+      email: '', phone: '', city: '', gender: '', categoryIds: [], notes: '', photoUrl: '', ...defaultValues,
     },
   })
 
@@ -90,7 +98,8 @@ export function DancerForm({
       .catch(() => { setCatsError(true); setLoadingCats(false) })
   }, [])
 
-  const watchedCategory = watch('categoryId')
+  const watchedCategories = watch('categoryIds')
+  const watchedGender   = watch('gender')
   const watchedBlood    = watch('bloodType')
   const watchedCommune  = watch('commune')
   const photoUrl        = watch('photoUrl')
@@ -101,13 +110,17 @@ export function DancerForm({
       setPhotoError('Elige una imagen (JPG, PNG o WebP)')
       return
     }
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Elige una imagen PNG o JPG')
+      return
+    }
     setUploadingPhoto(true)
     setPhotoError('')
     try {
-      const url = await uploadToImgbb(file)
+      const url = await compressLetterhead(file)
       setValue('photoUrl', url, { shouldDirty: true })
     } catch (e) {
-      setPhotoError(e instanceof Error ? e.message : 'No se pudo subir la foto')
+      setPhotoError(e instanceof Error ? e.message : 'No se pudo preparar la foto')
     } finally {
       setUploadingPhoto(false)
     }
@@ -122,18 +135,23 @@ export function DancerForm({
         <div className="flex items-center justify-between gap-2">
           {sectionTitle('Foto')}
           {photoUrl && (
-            <button
-              type="button"
-              className="mb-2 text-xs"
-              style={{ color: '#e05252', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-              onClick={() => setValue('photoUrl', '', { shouldDirty: true })}
-            >
-              Quitar foto
-            </button>
+            <div className="mb-2 flex items-center gap-3">
+              <PhotoLightbox src={photoUrl} alt="Foto del bailarín">
+                <span className="text-xs" style={{ color: 'var(--gold)' }}>Ver completa</span>
+              </PhotoLightbox>
+              <button
+                type="button"
+                className="text-xs"
+                style={{ color: '#e05252', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                onClick={() => setValue('photoUrl', '', { shouldDirty: true })}
+              >
+                Quitar foto
+              </button>
+            </div>
           )}
         </div>
         <FileUpload onChange={handlePhoto} previewUrl={photoUrl || null} />
-        {uploadingPhoto && <p className="text-xs mt-2" style={{ color: 'var(--gold)' }}>Subiendo foto…</p>}
+        {uploadingPhoto && <p className="text-xs mt-2" style={{ color: 'var(--gold)' }}>Preparando foto…</p>}
         {photoError && <p className="text-xs mt-2" style={{ color: 'var(--destructive)' }}>{photoError}</p>}
       </CardContent>
     </Card>
@@ -153,8 +171,16 @@ export function DancerForm({
           <FormField label="Fecha de nacimiento" required error={errors.birthDate?.message}>
             <DatePicker value={watch('birthDate')} onChange={v => setValue('birthDate', v, { shouldValidate: true })} />
           </FormField>
-          <FormField label="Categoría" required error={errors.categoryId?.message}
-            hint={catsError ? 'No se pudieron cargar las categorías.' : undefined}>
+          <FormField label="Género">
+            <SaokoCombobox
+              options={GENDERS}
+              value={watchedGender}
+              onValueChange={v => setValue('gender', v)}
+              placeholder="Femenino o masculino..."
+            />
+          </FormField>
+          <FormField label="Categorías" required error={errors.categoryIds?.message}
+            hint={catsError ? 'No se pudieron cargar las categorías.' : 'Puedes marcar varias. Doble Proceso se suma a la categoría del grupo.'}>
             {loadingCats ? (
               <Skeleton className="h-8 w-full rounded-lg" style={{ background: 'var(--accent)' }} />
             ) : categories.length === 0 ? (
@@ -163,12 +189,24 @@ export function DancerForm({
                 Sin categorías. Créalas en Ajustes.
               </div>
             ) : (
-              <SaokoCombobox
-                options={categories.map(c => ({ value: c.id, label: c.name }))}
-                value={watchedCategory}
-                onValueChange={v => setValue('categoryId', v)}
-                placeholder="Seleccionar categoría..."
-              />
+              <div className="flex flex-col gap-1.5 py-1">
+                {categories.map(c => {
+                  const checked = (watchedCategories ?? []).includes(c.id)
+                  return (
+                    <label key={c.id} className="flex items-center gap-2 text-sm" style={{ color: 'var(--foreground)', cursor: 'pointer' }}>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => {
+                          const cur = watchedCategories ?? []
+                          const next = checked ? cur.filter(id => id !== c.id) : [...cur, c.id]
+                          setValue('categoryIds', next, { shouldValidate: true })
+                        }}
+                      />
+                      {c.name}
+                    </label>
+                  )
+                })}
+              </div>
             )}
           </FormField>
           <FormField label="Teléfono">
@@ -192,6 +230,9 @@ export function DancerForm({
               <Input style={inputStyle} {...register('address')} placeholder="Calle 15 # 25-40" />
             </FormField>
           </div>
+          <FormField label="Ciudad">
+            <Input style={inputStyle} {...register('city')} placeholder="Cali" />
+          </FormField>
           <FormField label="Barrio">
             <Input style={inputStyle} {...register('neighborhood')} placeholder="El Limonar" />
           </FormField>

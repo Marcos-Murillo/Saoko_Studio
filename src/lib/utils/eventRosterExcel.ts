@@ -2,6 +2,7 @@ import { getEventRegistrations, REG_STATUS_LABEL } from '@/lib/services/event.se
 import { getDancers } from '@/lib/services/dancer.service'
 import { downloadXlsxBook } from '@/lib/utils/exportExcel'
 import { formatDate, getAge } from '@/lib/utils/dates'
+import { readCategoryNames } from '@/lib/utils/dancerCategories'
 import type { EventRegistration, StudioEvent } from '@/types'
 
 function slug(name: string) {
@@ -51,10 +52,12 @@ export async function downloadEventRosterExcel(event: StudioEvent) {
       Direccion: dancer?.address ?? '',
       Barrio: dancer?.neighborhood ?? '',
       Comuna: dancer?.commune ?? '',
+      Ciudad: dancer?.city ?? '',
+      Genero: dancer?.gender ?? '',
       EPS: dancer?.eps ?? '',
       TipoSangre: dancer?.bloodType ?? '',
       Grupo: dancer?.currentGroupName ?? '',
-      CategoriaAcademia: dancer?.categoryName ?? '',
+      CategoriaAcademia: dancer ? readCategoryNames(dancer).join(', ') : '',
       CategoriasEvento: categories.join(', '),
       EstadoPago: overallStatus(regs),
     }
