@@ -188,7 +188,7 @@ function readPeople(file: string): Person[] {
 }
 
 function personCategories(p: Person) {
-  const names = [...new Set(p.groups.map(categoryForGroup))]
+  const names: string[] = [...new Set(p.groups.map(categoryForGroup))]
   if (p.doble) names.push('Doble Proceso')
   const order = ['Infantil', 'Pre-juvenil', 'Juvenil', 'Adulto', 'Doble Proceso']
   names.sort((a, b) => order.indexOf(a) - order.indexOf(b))
