@@ -1,7 +1,7 @@
 import type { ElementType } from 'react'
 import {
   LayoutDashboard, Users, UsersRound, CalendarDays,
-  DollarSign, Settings, Shirt, Ticket, Mail,
+  DollarSign, Settings, Shirt, Ticket,
 } from 'lucide-react'
 import { PERMISSIONS } from '@/lib/auth/roles'
 import type { AppRole } from '@/lib/auth/roles'
@@ -21,7 +21,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/accounting', label: 'Caja',          icon: DollarSign,      check: PERMISSIONS.canManageAccounting },
   { href: '/events',     label: 'Eventos',       icon: Ticket,          check: PERMISSIONS.canManageEvents },
   { href: '/costumes',   label: 'Vestuario',     icon: Shirt,           check: PERMISSIONS.canManageCostumes },
-  { href: '/correos',    label: 'Correos',       icon: Mail,            check: PERMISSIONS.canManageDancers },
   { href: '/settings',   label: 'Ajustes',       icon: Settings,        check: PERMISSIONS.canManageSettings },
 ]
 
