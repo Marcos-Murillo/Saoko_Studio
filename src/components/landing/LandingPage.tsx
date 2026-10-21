@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
+import { homeForRole } from '@/lib/auth/roles'
 import { StudioPreview } from '@/components/landing/StudioPreview'
 import { LandingNav } from '@/components/landing/LandingNav'
 import { HeroOrbs } from '@/components/landing/HeroOrbs'
@@ -17,8 +18,8 @@ import './landing.css'
 const MARK = '/LOGOS/N%20SIN%20FONDO.png'
 
 export function LandingPage() {
-  const { user } = useAuth()
-  const enterHref = user ? '/dashboard' : '/login'
+  const { user, adminUser } = useAuth()
+  const enterHref = user ? homeForRole(adminUser?.role) : '/login'
   const [cursor, setCursor] = useState({ x: -400, y: -400 })
 
   useEffect(() => {

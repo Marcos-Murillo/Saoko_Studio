@@ -24,10 +24,6 @@ service cloud.firestore {
       return myProfile().role;
     }
 
-    function isTeacher() {
-      return isActiveUser() && role() == 'teacher';
-    }
-
     function isOps() {
       return isActiveUser() && role() in ['staff', 'admin', 'super_admin'];
     }
@@ -38,6 +34,40 @@ service cloud.firestore {
 
     function isSuper() {
       return isActiveUser() && role() == 'super_admin';
+    }
+
+    function isStudent() {
+      return isActiveUser() && role() == 'student';
+    }
+
+    function isInternal() {
+      return isActiveUser() && role() in ['teacher', 'staff', 'admin', 'super_admin'];
+    }
+
+    function myDancerId() {
+      return myProfile().dancerId;
+    }
+
+    function emailMatches(value) {
+      return request.auth.token.email is string
+        && value is string
+        && value.trim().lower() == request.auth.token.email.trim().lower();
+    }
+
+    function isUnclaimed(data) {
+      return !data.keys().hasAny(['authUid'])
+        || data.authUid == null
+        || data.authUid == request.auth.uid;
+    }
+
+    function ownsDancer(dancerId) {
+      let dancer = get(/databases/$(database)/documents/dancers/$(dancerId)).data;
+      let claimPath = /databases/$(database)/documents/dancerClaims/$(request.resource.data.documentNumber);
+      let byClaim = request.resource.data.documentNumber is string
+        && exists(claimPath)
+        && get(claimPath).data.dancerId == dancerId
+        && emailMatches(get(claimPath).data.email);
+      return isUnclaimed(dancer) && (emailMatches(dancer.email) || byClaim);
     }
 
     // Document ID MUST equal Firebase Auth UID. Create the first super_admin
@@ -64,6 +94,18 @@ service cloud.firestore {
         && request.resource.data.role == 'super_admin'
         && request.resource.data.isActive == true
         && request.auth.token.email.matches('superadmin\\..+@saokostudio\\.internal')
+      ) || (
+        signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'student'
+        && request.resource.data.isActive == true
+        && request.resource.data.mustSetPassword == false
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.dancerId is string
+        && request.resource.data.documentNumber is string
+        && request.resource.data.name is string
+        && ownsDancer(request.resource.data.dancerId)
       );
       allow update: if (
         isAdmin()
@@ -86,7 +128,16 @@ service cloud.firestore {
     match /loginAliases/{documentNumber} {
       allow get: if true;
       allow list: if false;
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin() || (
+        signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.mustSetPassword == false
+        && exists(myUserPath())
+        && myProfile().role == 'student'
+        && myProfile().documentNumber == documentNumber
+      );
+      allow delete: if isAdmin();
       allow update: if isAdmin()
         || (
           signedIn()
@@ -118,16 +169,72 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /dancerClaims/{cedula} {
+      allow get: if true;
+      allow list: if isOps()
+        || (signedIn() && resource.data.email == request.auth.token.email);
+      allow create: if isOps() || (
+        signedIn()
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.dancerId is string
+      );
+      allow update: if isOps() || (
+        signedIn()
+        && emailMatches(resource.data.email)
+        && emailMatches(request.resource.data.email)
+        && request.resource.data.dancerId == resource.data.dancerId
+        && request.resource.data.authUid == request.auth.uid
+        && isUnclaimed(resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['authUid', 'missing', 'fullName', 'isActive', 'documentKey'])
+      );
+      allow delete: if false;
+    }
+
     match /dancers/{id} {
-      allow read: if isActiveUser();
-      allow write: if isOps();
+      allow get: if isInternal() || (
+        signedIn() && (
+          (exists(myUserPath()) && myProfile().role == 'student' && id == myProfile().dancerId)
+          || resource.data.authUid == request.auth.uid
+        )
+      );
+      allow list: if isInternal()
+        || (signedIn() && resource.data.email == request.auth.token.email)
+        || (signedIn() && resource.data.authUid == request.auth.uid);
+      allow create: if isOps() || (
+        signedIn()
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.isActive == true
+        && request.resource.data.documentNumber is string
+        && request.resource.data.fullName is string
+        && !exists(/databases/$(database)/documents/dancerClaims/$(request.resource.data.documentNumber))
+      );
+      allow update: if isOps() || (
+        signedIn()
+        && exists(myUserPath())
+        && myProfile().role == 'student'
+        && myProfile().dancerId == id
+        && emailMatches(resource.data.email)
+        && emailMatches(request.resource.data.email)
+        && request.resource.data.authUid == request.auth.uid
+        && isUnclaimed(resource.data)
+        && request.resource.data.documentNumber == resource.data.documentNumber
+        && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'authUid', 'phone', 'address', 'neighborhood', 'commune', 'city',
+          'birthDate', 'gender', 'eps', 'email', 'documentKey', 'updatedAt'
+        ])
+      );
+      allow delete: if isOps();
     }
     match /guardians/{id} {
-      allow read: if isActiveUser();
+      allow read: if isInternal();
       allow write: if isOps();
     }
     match /dancerGuardians/{id} {
-      allow read: if isActiveUser();
+      allow read: if isInternal();
       allow write: if isOps();
     }
 
@@ -136,7 +243,7 @@ service cloud.firestore {
       allow write: if isOps();
     }
     match /groupMemberships/{id} {
-      allow read: if isActiveUser();
+      allow read: if isInternal() || (isStudent() && resource.data.dancerId == myDancerId());
       allow write: if isOps();
     }
     match /schedules/{id} {
@@ -145,16 +252,19 @@ service cloud.firestore {
     }
 
     match /monthlyFees/{id} {
-      allow read, write: if isOps();
+      allow read: if isOps() || (isStudent() && resource.data.dancerId == myDancerId());
+      allow write: if isOps();
     }
     match /payments/{id} {
-      allow read, write: if isOps();
+      allow read: if isOps() || (isStudent() && resource.data.dancerId == myDancerId());
+      allow write: if isOps();
     }
     match /paymentAllocations/{id} {
       allow read, write: if isOps();
     }
     match /dancerCredits/{id} {
-      allow read, write: if isOps();
+      allow read: if isOps() || (isStudent() && resource.data.dancerId == myDancerId());
+      allow write: if isOps();
     }
     match /creditTransactions/{id} {
       allow read, write: if isOps();

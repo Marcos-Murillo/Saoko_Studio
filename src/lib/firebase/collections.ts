@@ -14,6 +14,7 @@ export const COLLECTIONS = {
   // People
   ADMIN_USERS: 'adminUsers',
   LOGIN_ALIASES: 'loginAliases',
+  DANCER_CLAIMS: 'dancerClaims',
   DANCERS: 'dancers',
   GUARDIANS: 'guardians',
   DANCER_GUARDIANS: 'dancerGuardians',

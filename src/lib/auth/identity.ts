@@ -1,6 +1,6 @@
 /** Digits-only cédula used as login alias and first-access proof. */
-export function normalizeDocumentNumber(value: string): string {
-  return value.replace(/\D/g, '')
+export function normalizeDocumentNumber(value: unknown): string {
+  return String(value ?? '').replace(/\D/g, '')
 }
 
 export function isDocumentNumber(value: string): boolean {

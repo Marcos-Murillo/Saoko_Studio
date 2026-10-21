@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, ShieldCheck, UserCog, GraduationCap, Shield, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { Plus, ShieldCheck, UserCog, GraduationCap, Shield, UserRound, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { ensureDancerClaims } from '@/lib/services/dancerClaim.service'
 import {
   getAdminUsers, createAdminUser, updateAdminUserRole,
   toggleAdminUserActive,
@@ -28,6 +29,7 @@ const ROLE_ICONS: Record<AppRole, React.ElementType> = {
   admin: ShieldCheck,
   staff: UserCog,
   teacher: GraduationCap,
+  student: UserRound,
 }
 
 const schema = z.object({
@@ -202,6 +204,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const load = async () => { setLoading(true); setUsers(await getAdminUsers()); setLoading(false) }
   useEffect(() => { load() }, [])
@@ -229,15 +232,38 @@ export default function UsersPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-          Usuarios con acceso al sistema administrativo.
+          Los bailarines se registran solos y entran como estudiantes. Desde aquí les asignas el rol de profesor.
         </p>
-        {canManage && myAssignable.length > 0 && (
-          <Button onClick={() => setCreateOpen(true)}
-            style={{ background: 'linear-gradient(135deg, var(--gold-dark), var(--gold))', color: '#000', border: 'none' }}>
-            <Plus size={15} className="mr-2" /> Nuevo usuario
-          </Button>
+        {canManage && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              disabled={syncing}
+              onClick={async () => {
+                setSyncing(true)
+                try {
+                  const ready = await ensureDancerClaims()
+                  toast(`${ready} bailarines pueden crear su contraseña`)
+                } catch {
+                  toast('No se pudo preparar el acceso de los bailarines', 'error')
+                } finally {
+                  setSyncing(false)
+                }
+              }}
+              variant="outline"
+              style={{ background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+            >
+              {syncing ? 'Activando...' : 'Activar accesos'}
+            </Button>
+            {myAssignable.some(role => role !== 'student') && (
+              <Button onClick={() => setCreateOpen(true)}
+                style={{ background: 'linear-gradient(135deg, var(--gold-dark), var(--gold))', color: '#000', border: 'none' }}>
+                <Plus size={15} className="mr-2" /> Nuevo usuario
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -331,6 +357,13 @@ export default function UsersPage() {
                             { label: 'Acceso', value: isSuperAdmin ? `Cédula: ${u.documentNumber ?? '—'}` : (u.email || '—') },
                             { label: 'Rol', value: ROLE_LABELS[u.role] },
                           ]}>
+                            {!isSuperAdmin && !isSelf && myAssignable
+                              .filter(role => role !== u.role)
+                              .map(role => (
+                                <DropdownMenuItem key={role} style={{ cursor: 'pointer' }} onClick={() => handleRoleChange(u, role)}>
+                                  Pasar a {ROLE_LABELS[role]}
+                                </DropdownMenuItem>
+                              ))}
                             {!isSuperAdmin && !isSelf && (
                               <DropdownMenuItem style={{ cursor: 'pointer' }} onClick={() => handleToggle(u)}>
                                 {u.isActive ? 'Desactivar' : 'Activar'}
@@ -359,7 +392,7 @@ export default function UsersPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={load}
-        myAssignable={myAssignable}
+        myAssignable={myAssignable.filter(role => role !== 'student')}
       />
     </div>
   )

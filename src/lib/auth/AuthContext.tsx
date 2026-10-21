@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -14,6 +14,7 @@ import { db, getFirebaseAuth } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { AppRole } from '@/lib/auth/roles'
 import { normalizeDocumentNumber } from '@/lib/auth/identity'
+import { completeStudentAccess } from '@/lib/services/registration.service'
 
 export interface AdminUser {
   id: string
@@ -24,13 +25,15 @@ export interface AdminUser {
   isActive: boolean
   documentNumber?: string
   mustSetPassword?: boolean
+  dancerId?: string
 }
 
 interface AuthContextValue {
   user: User | null
   adminUser: AdminUser | null
   loading: boolean
-  signIn: (emailOrUsername: string, password: string) => Promise<{ mustSetPassword: boolean }>
+  signIn: (emailOrUsername: string, password: string) => Promise<{ mustSetPassword: boolean; role?: AppRole }>
+  reloadProfile: () => Promise<void>
   completeFirstAccess: (input: {
     email: string
     documentNumber: string
@@ -52,6 +55,7 @@ function mapAdminUser(id: string, data: Record<string, unknown>, fallbackUid: st
     isActive: data.isActive as boolean,
     documentNumber: data.documentNumber as string | undefined,
     mustSetPassword: data.mustSetPassword === true,
+    dancerId: data.dancerId as string | undefined,
   }
 }
 
@@ -79,25 +83,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const loadGen = useRef(0)
 
   const loadAdminUser = async (firebaseUser: User) => {
+    const gen = ++loadGen.current
+    const finish = (profile: AdminUser | null) => {
+      if (gen !== loadGen.current) return
+      setAdminUser(profile)
+    }
     try {
       const byId = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, firebaseUser.uid))
       if (byId.exists()) {
         const profile = mapAdminUser(byId.id, byId.data(), firebaseUser.uid)
         if (!profile.isActive) {
+          if (gen !== loadGen.current) return
           await firebaseSignOut(getFirebaseAuth())
-          setAdminUser(null)
+          finish(null)
           return
         }
-        setAdminUser(profile)
+        finish(profile)
         return
       }
 
-      const legacy = await getDocs(
-        query(collection(db, COLLECTIONS.ADMIN_USERS), where('uid', '==', firebaseUser.uid)),
-      )
-      if (!legacy.empty) {
+      let legacyEmpty = true
+      try {
+        const legacy = await getDocs(
+          query(collection(db, COLLECTIONS.ADMIN_USERS), where('uid', '==', firebaseUser.uid)),
+        )
+        legacyEmpty = legacy.empty
+        if (!legacy.empty) {
         const data = legacy.docs[0].data()
         await setDoc(doc(db, COLLECTIONS.ADMIN_USERS, firebaseUser.uid), {
           ...data,
@@ -106,15 +120,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, { merge: true })
         const profile = mapAdminUser(firebaseUser.uid, data, firebaseUser.uid)
         if (!profile.isActive) {
+          if (gen !== loadGen.current) return
           await firebaseSignOut(getFirebaseAuth())
-          setAdminUser(null)
+          finish(null)
           return
         }
-        setAdminUser(profile)
+        finish(profile)
         return
+        }
+      } catch {
+        legacyEmpty = true
       }
+      if (!legacyEmpty) return
 
       const email = firebaseUser.email ?? ''
+      try {
+        await firebaseUser.getIdToken(true)
+        const linked = await completeStudentAccess(firebaseUser)
+        if (linked) {
+          const created = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, firebaseUser.uid))
+          if (created.exists()) {
+            const profile = mapAdminUser(created.id, created.data(), firebaseUser.uid)
+            if (profile.isActive) {
+              finish(profile)
+              return
+            }
+          }
+        }
+      } catch (error) {
+        console.error('No se pudo crear el perfil del estudiante', error)
+      }
+
       if (/^superadmin\..+@saokostudio\.internal$/i.test(email)) {
         await setDoc(doc(db, COLLECTIONS.ADMIN_USERS, firebaseUser.uid), {
           uid: firebaseUser.uid,
@@ -126,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
-        setAdminUser({
+        finish({
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
           name: 'Super Administrador',
@@ -137,9 +173,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      setAdminUser(null)
+      finish(null)
     } catch {
-      setAdminUser(null)
+      finish(null)
     }
   }
 
@@ -162,7 +198,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
     await loadAdminUser(cred.user)
     const profile = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, cred.user.uid))
-    return { mustSetPassword: profile.data()?.mustSetPassword === true }
+    return {
+      mustSetPassword: profile.data()?.mustSetPassword === true,
+      role: profile.data()?.role as AppRole | undefined,
+    }
+  }
+
+  const reloadProfile = async () => {
+    const current = getFirebaseAuth().currentUser
+    if (!current) return
+    await loadAdminUser(current)
   }
 
   const persistPasswordSet = async (uid: string, documentNumber?: string) => {
@@ -236,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, adminUser, loading, signIn, completeFirstAccess, completePasswordSetup, signOut,
+      user, adminUser, loading, signIn, reloadProfile, completeFirstAccess, completePasswordSetup, signOut,
     }}>
       {children}
     </AuthContext.Provider>

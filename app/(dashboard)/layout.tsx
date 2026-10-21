@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { PERMISSIONS } from '@/lib/auth/roles'
+import { ensureDancerClaims } from '@/lib/services/dancerClaim.service'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { MobileTabBar } from '@/components/layout/MobileTabBar'
@@ -11,13 +12,28 @@ import { BrandLoader } from '@/components/shared/LoadingSpinner'
 import { SetPasswordForm } from '@/components/auth/SetPasswordForm'
 import { ensureCurrentMonthFees } from '@/lib/services/fee.service'
 
+let claimsReady = false
+let claimsRunning = false
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, adminUser, loading, signOut, completePasswordSetup } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login')
-  }, [user, loading, router])
+    if (loading) return
+    if (!user) router.replace('/login')
+    else if (adminUser?.role === 'student') router.replace('/mi-espacio')
+  }, [user, adminUser, loading, router])
+
+  useEffect(() => {
+    if (!adminUser || adminUser.mustSetPassword) return
+    if (adminUser.role === 'student' || adminUser.role === 'teacher') return
+    if (claimsReady || claimsRunning) return
+    claimsRunning = true
+    ensureDancerClaims()
+      .then(() => { claimsReady = true })
+      .catch(() => { claimsRunning = false })
+  }, [adminUser])
 
   useEffect(() => {
     if (!adminUser || adminUser.mustSetPassword) return
@@ -26,7 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [adminUser])
 
   if (loading) return <BrandLoader />
-  if (!user) return null
+  if (!user || adminUser?.role === 'student') return null
   if (adminUser?.mustSetPassword) {
     return (
       <div className="min-h-dvh flex items-center justify-center px-5 py-8" style={{ background: 'var(--background)' }}>
@@ -52,33 +68,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
   if (!adminUser) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 max-w-lg mx-auto" style={{ background: 'var(--background)' }}>
-        <p className="text-sm font-semibold text-center" style={{ color: 'var(--foreground)' }}>
-          Auth funcionó, pero falta tu perfil en Firestore.
+      <div className="min-h-dvh flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: 'var(--background)' }}>
+        <p className="text-base font-semibold" style={{ color: 'var(--foreground)' }}>
+          Tu espacio todavía no está listo
         </p>
-        <p className="text-xs text-center" style={{ color: 'var(--muted-foreground)' }}>
-          Firestore → colección adminUsers → Añadir documento. El ID debe ser este UID:
-        </p>
-        <code
-          className="text-xs break-all p-3 rounded-lg w-full text-center"
-          style={{ background: 'var(--accent)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
-        >
-          {user.uid}
-        </code>
-        <p className="text-xs text-center" style={{ color: 'var(--muted-foreground)' }}>
-          Correo: <strong style={{ color: 'var(--foreground)' }}>{user.email}</strong>
-        </p>
-        <p className="text-xs text-center" style={{ color: 'var(--muted-foreground)' }}>
-          Campos: uid (el mismo), name, email, role = super_admin, isActive = true.
-          Publica también las reglas nuevas de adminUsers y recarga.
+        <p className="max-w-sm text-sm" style={{ color: 'var(--muted-foreground)' }}>
+          Recarga la página. Si ya habías entrado, se abre solo.
         </p>
         <button
           type="button"
-          onClick={() => navigator.clipboard.writeText(user.uid)}
-          className="text-xs px-3 py-2 rounded-lg"
-          style={{ background: 'var(--gold)', color: '#000', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+          onClick={() => window.location.reload()}
+          className="h-11 rounded-full px-5 text-sm font-semibold"
+          style={{ background: 'var(--gold)', color: '#000', border: 'none', cursor: 'pointer' }}
         >
-          Copiar UID
+          Recargar
         </button>
         <button
           type="button"

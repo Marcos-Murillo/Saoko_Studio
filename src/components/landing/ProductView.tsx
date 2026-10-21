@@ -2,14 +2,15 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth/AuthContext'
+import { homeForRole } from '@/lib/auth/roles'
 import { LandingNav } from '@/components/landing/LandingNav'
 import { getProduct } from '@/components/landing/productCatalog'
 import '@/components/landing/landing.css'
 
 export function ProductView({ slug }: { slug: string }) {
   const product = getProduct(slug)
-  const { user } = useAuth()
-  const enterHref = user ? '/dashboard' : '/login'
+  const { user, adminUser } = useAuth()
+  const enterHref = user ? homeForRole(adminUser?.role) : '/login'
   if (!product) return null
   const Icon = product.icon
 

@@ -14,6 +14,7 @@ import { db } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { Dancer, Guardian, DancerGuardian } from '@/types'
 import { logAudit } from './audit.service'
+import { writeDancerClaim } from './dancerClaim.service'
 
 function snapToEntity<T>(snap: { id: string; data: () => Record<string, unknown> }): T {
   return { id: snap.id, ...snap.data() } as T
@@ -46,6 +47,11 @@ export async function createDancer(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
+  try {
+    await writeDancerClaim({ id: ref.id, ...data, isActive: true })
+  } catch {
+    // The dancer record is already saved. The claim index can be rebuilt later.
+  }
   return ref.id
 }
 
@@ -54,6 +60,12 @@ export async function updateDancer(id: string, data: Partial<Dancer>): Promise<v
     ...data,
     updatedAt: serverTimestamp(),
   })
+  try {
+    const fresh = await getDancerById(id)
+    if (fresh) await writeDancerClaim(fresh)
+  } catch {
+    // A failed claim refresh must not roll back the dancer edit.
+  }
 }
 
 export async function deactivateDancer(id: string, actor?: { id: string; name: string }): Promise<void> {

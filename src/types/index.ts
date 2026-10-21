@@ -50,7 +50,7 @@ export interface ExpenseCategory extends BaseEntity {
 // ─────────────────────────────────────────────
 // Admin Users
 // ─────────────────────────────────────────────
-export type AdminRole = 'super_admin' | 'admin' | 'staff' | 'teacher'
+export type AdminRole = 'super_admin' | 'admin' | 'staff' | 'teacher' | 'student'
 
 export interface AdminUser extends BaseEntity {
   name: string
@@ -61,6 +61,8 @@ export interface AdminUser extends BaseEntity {
   uid: string
   documentNumber?: string
   mustSetPassword?: boolean
+  /** Present when the account belongs to a dancer. */
+  dancerId?: string
 }
 
 // ─────────────────────────────────────────────
@@ -117,6 +119,10 @@ export interface Dancer extends BaseEntity {
   // Denormalized: current group info for quick display
   currentGroupId: string | null
   currentGroupName: string | null
+  /** Firebase Auth uid once the dancer creates a password. */
+  authUid?: string | null
+  /** Digits-only cédula used to claim the account. */
+  documentKey?: string
 }
 
 // ─────────────────────────────────────────────
