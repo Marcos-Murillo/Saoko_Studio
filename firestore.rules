@@ -216,15 +216,17 @@ service cloud.firestore {
         && exists(myUserPath())
         && myProfile().role == 'student'
         && myProfile().dancerId == id
-        && emailMatches(resource.data.email)
-        && emailMatches(request.resource.data.email)
+        && (emailMatches(resource.data.email) || resource.data.authUid == request.auth.uid)
+        && (emailMatches(request.resource.data.email) || request.resource.data.email == resource.data.email)
         && request.resource.data.authUid == request.auth.uid
         && isUnclaimed(resource.data)
         && request.resource.data.documentNumber == resource.data.documentNumber
         && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.fullName is string
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'authUid', 'phone', 'address', 'neighborhood', 'commune', 'city',
-          'birthDate', 'gender', 'eps', 'email', 'documentKey', 'updatedAt'
+          'authUid', 'fullName', 'phone', 'address', 'neighborhood', 'commune', 'city',
+          'birthDate', 'gender', 'eps', 'epsLocation', 'bloodType', 'photoUrl',
+          'email', 'documentKey', 'updatedAt'
         ])
       );
       allow delete: if isOps();

@@ -1,11 +1,11 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
-import { getStudentPortal, type StudentPortalData } from '@/lib/services/portal.service'
+import { getStudentPortal, saveStudentProfile, type StudentPortalData, type StudentProfile } from '@/lib/services/portal.service'
 import { StudentHome } from '@/components/portal/StudentHome'
 
 export default function StudentSpacePage() {
-  const { adminUser, signOut } = useAuth()
+  const { user, adminUser, signOut } = useAuth()
   const [data, setData] = useState<StudentPortalData | null>(null)
   const [error, setError] = useState('')
 
@@ -40,5 +40,11 @@ export default function StudentSpacePage() {
     )
   }
 
-  return <StudentHome data={data} onSignOut={() => signOut()} />
+  const saveProfile = async (input: StudentProfile) => {
+    if (!user || !adminUser.dancerId) throw new Error('Tu sesión no está lista.')
+    await saveStudentProfile(adminUser.dancerId, user.uid, input)
+    setData(await getStudentPortal(adminUser.dancerId))
+  }
+
+  return <StudentHome data={data} onSignOut={() => signOut()} onSaveProfile={saveProfile} />
 }
