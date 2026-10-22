@@ -112,6 +112,9 @@ export interface Dancer extends BaseEntity {
   categoryName?: string
   categoryIds?: string[]
   categoryNames?: string[]
+  /** Grupo extra cuando tiene Doble Proceso. Asiste, pero no se le cobra. */
+  secondGroupId?: string | null
+  secondGroupName?: string | null
   isActive: boolean
   inactiveDate: Timestamp | null
   notes: string
@@ -154,6 +157,11 @@ export interface GroupMembership extends BaseEntity {
   isCurrent: boolean
   /** Price snapshot at time of enrollment — never changes retroactively */
   monthlyFeeSnapshot: number
+  /**
+   * false = segundo grupo de Doble Proceso: asiste y no genera mensualidad.
+   * Sin valor, o true, el grupo sí se cobra.
+   */
+  chargesFee?: boolean
   notes: string
 }
 

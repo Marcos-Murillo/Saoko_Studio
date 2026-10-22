@@ -3,14 +3,15 @@ import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
-  CalendarDays, Eye, EyeOff, Home, LogOut, MapPin, Receipt, UsersRound,
+  CalendarDays, Eye, EyeOff, Home, LogOut, MapPin, Receipt, UserRound, UsersRound,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate, formatMonth } from '@/lib/utils/dates'
 import type { FeeStatus } from '@/types'
-import type { PortalClass, PortalGroup, StudentPortalData } from '@/lib/services/portal.service'
+import type { PortalClass, PortalGroup, StudentPortalData, StudentProfile } from '@/lib/services/portal.service'
+import { StudentProfileForm } from '@/components/portal/StudentProfileForm'
 
-type Tab = 'inicio' | 'grupos' | 'horario' | 'pagos'
+type Tab = 'inicio' | 'grupos' | 'horario' | 'pagos' | 'perfil'
 
 const MARK = '/LOGOS/N%20SIN%20FONDO.png'
 
@@ -19,6 +20,7 @@ const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: 'grupos', label: 'Grupos', icon: UsersRound },
   { id: 'horario', label: 'Horario', icon: CalendarDays },
   { id: 'pagos', label: 'Pagos', icon: Receipt },
+  { id: 'perfil', label: 'Perfil', icon: UserRound },
 ]
 
 const FEE_LABEL: Record<FeeStatus | 'none', { label: string; bg: string; color: string }> = {
@@ -52,9 +54,11 @@ function money(value: number, hidden: boolean) {
 export function StudentHome({
   data,
   onSignOut,
+  onSaveProfile,
 }: {
   data: StudentPortalData
   onSignOut: () => void
+  onSaveProfile: (input: StudentProfile) => Promise<void>
 }) {
   const [tab, setTab] = useState<Tab>('inicio')
   const [hidden, setHidden] = useState(false)
@@ -122,19 +126,27 @@ export function StudentHome({
           <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">
             {tab === 'inicio' ? 'Mi espacio' : month}
           </p>
-          <h1 className="mt-1 text-[1.75rem] font-bold leading-none tracking-tight">{title}</h1>
+          <div className="mt-4 flex items-center gap-3">
+            <ProfileMark photoUrl={data.photoUrl} name={data.fullName} onOpen={() => setTab('perfil')} />
+            <h1 className="text-[1.75rem] font-bold leading-none tracking-tight">{title}</h1>
+          </div>
         </header>
 
         <main className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 pt-5 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:gap-6 md:px-10 md:py-10 md:pb-12">
           <div className="hidden items-end justify-between md:flex">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">
-                {tab === 'inicio' ? 'Mi espacio' : 'Nexora'}
-              </p>
-              <h1 className="mt-1 text-4xl font-bold tracking-tight">{title}</h1>
+            <div className="flex items-center gap-4">
+              <ProfileMark photoUrl={data.photoUrl} name={data.fullName} onOpen={() => setTab('perfil')} />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">
+                  {tab === 'inicio' ? 'Mi espacio' : 'Nexora'}
+                </p>
+                <h1 className="mt-1 text-4xl font-bold tracking-tight">{title}</h1>
+              </div>
             </div>
             <p className="text-sm text-[#a09070]">{month}</p>
           </div>
+
+          {tab === 'perfil' && <StudentProfileForm profile={data.profile} onSave={onSaveProfile} />}
 
           {(tab === 'inicio' || tab === 'pagos') && (
             <section className={`grid gap-4 ${tab === 'inicio' ? 'md:grid-cols-[1.4fr_1fr]' : ''}`}>
@@ -143,17 +155,17 @@ export function StudentHome({
             </section>
           )}
 
-          {tab === 'inicio' && nextClass && <NextClassBanner item={nextClass} today={today} />}
+          {tab !== 'perfil' && tab === 'inicio' && nextClass && <NextClassBanner item={nextClass} today={today} />}
 
           {tab === 'grupos' && <GroupsBlock groups={data.groups} hidden={hidden} />}
 
-          {(tab === 'inicio' || tab === 'horario') && (
+          {tab !== 'perfil' && (tab === 'inicio' || tab === 'horario') && (
             <ScheduleBlock classes={data.classes} today={today} />
           )}
 
-          {(tab === 'inicio' || tab === 'grupos') && <TeachersBlock teachers={data.teachers} />}
+          {tab !== 'perfil' && (tab === 'inicio' || tab === 'grupos') && <TeachersBlock teachers={data.teachers} />}
 
-          {(tab === 'inicio' || tab === 'pagos') && (
+          {tab !== 'perfil' && (tab === 'inicio' || tab === 'pagos') && (
             <PaymentsBlock
               payments={tab === 'inicio' ? data.payments.slice(0, 3) : data.payments}
               fees={data.fees}
@@ -170,7 +182,7 @@ export function StudentHome({
           style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
           aria-label="Secciones"
         >
-          <div className="grid grid-cols-4">
+          <div className="grid grid-cols-5">
             {TABS.map(item => {
               const Icon = item.icon
               const active = tab === item.id
@@ -192,6 +204,22 @@ export function StudentHome({
         </nav>
       </div>
     </div>
+  )
+}
+
+function ProfileMark({ photoUrl, name, onOpen }: { photoUrl: string | null; name: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Editar perfil"
+      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[rgba(201,168,76,.4)]"
+      style={{ background: 'var(--accent)', padding: 0, cursor: 'pointer' }}
+    >
+      {photoUrl
+        ? <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+        : <span className="text-lg font-bold text-[var(--gold)]">{name.charAt(0).toUpperCase() || 'N'}</span>}
+    </button>
   )
 }
 
@@ -264,7 +292,7 @@ function MonthAside({ data, month, hidden }: { data: StudentPortalData; month: s
               <p className="text-xs text-[#a09070]">{group.teacher || 'Profesor por confirmar'}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold">{money(group.monthRemaining || group.monthlyFee, hidden)}</p>
+              <p className="text-sm font-semibold">{group.chargesFee ? money(group.monthRemaining || group.monthlyFee, hidden) : 'Incluido'}</p>
               <StatusPill status={group.monthStatus} />
             </div>
           </div>
@@ -291,7 +319,11 @@ function GroupsBlock({ groups, hidden }: { groups: PortalGroup[]; hidden: boolea
                 </div>
                 <StatusPill status={group.monthStatus} />
               </div>
-              <p className="mt-4 text-2xl font-bold tracking-tight text-[var(--gold-light)]">{money(group.monthlyFee, hidden)}<span className="text-sm font-medium text-[#a09070]"> / mes</span></p>
+              {group.chargesFee ? (
+                <p className="mt-4 text-2xl font-bold tracking-tight text-[var(--gold-light)]">{money(group.monthlyFee, hidden)}<span className="text-sm font-medium text-[#a09070]"> / mes</span></p>
+              ) : (
+                <p className="mt-4 text-lg font-bold tracking-tight text-[var(--gold-light)]">Sin cobro adicional</p>
+              )}
               <p className="mt-1 text-sm">Profesor: <strong>{group.teacher || 'por confirmar'}</strong></p>
               <div className="mt-3 flex flex-col gap-1">
                 {group.classes.length === 0 && <p className="text-sm text-[#a09070]">Sin horario publicado.</p>}

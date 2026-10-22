@@ -76,8 +76,9 @@ export default function NewPaymentPage() {
   useEffect(() => {
     if (!selectedDancerId) { setMemberships([]); setGroupId(''); return }
     getDancerCurrentMemberships(selectedDancerId).then(m => {
-      setMemberships(m)
-      setGroupId(m.length === 1 ? m[0].groupId : '')
+      const billable = m.filter(item => item.chargesFee !== false)
+      setMemberships(billable)
+      setGroupId(billable.length === 1 ? billable[0].groupId : '')
     })
   }, [selectedDancerId])
 

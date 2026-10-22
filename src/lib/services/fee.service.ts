@@ -8,6 +8,8 @@
  * 2. Inactive dancers do NOT get new fees.
  * 3. If a dancer has credit, it is applied automatically on generation.
  * 4. Duplicate fees for same (dancer, group, year, month) are prevented.
+ * 5. A membership with chargesFee === false does not generate a fee.
+ *    Doble Proceso adds a second group the dancer attends, but only the main group is billed.
  */
 import {
   collection,
@@ -16,6 +18,7 @@ import {
   getDocs,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   serverTimestamp,
@@ -164,6 +167,20 @@ export async function generateFeeForDancer(
   return { feeId: ref.id, wasExisting: false }
 }
 
+/** Quita cuotas sin abono de un grupo que ya no se cobra. */
+export async function removeUnpaidFeesForGroup(dancerId: string, groupId: string): Promise<number> {
+  const fees = await getMonthlyFeesByDancer(dancerId)
+  let removed = 0
+  for (const fee of fees) {
+    if (fee.groupId !== groupId) continue
+    if ((fee.amountPaid ?? 0) > 0) continue
+    if (fee.status === 'paid' || fee.status === 'forgiven') continue
+    await deleteDoc(doc(db, COLLECTIONS.MONTHLY_FEES, fee.id))
+    removed++
+  }
+  return removed
+}
+
 /**
  * Generate fees for ALL active dancers with current memberships.
  * Called manually by admin or scheduled via a server action.
@@ -186,6 +203,10 @@ export async function generateMonthlyFees(
 
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
+    if (membership.chargesFee === false) {
+      skipped++
+      continue
+    }
 
     // Verify dancer is still active
     const dancerSnap = await getDoc(doc(db, COLLECTIONS.DANCERS, membership.dancerId as string))
@@ -237,6 +258,7 @@ export async function ensureDancerMonthFees(
 
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
+    if (membership.chargesFee === false) continue
     await generateFeeForDancer(
       dancerId,
       (membership.dancerName as string) ?? (dancerSnap.data().fullName as string),

@@ -1,10 +1,16 @@
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase/config'
+import { COLLECTIONS } from '@/lib/firebase/collections'
+import { normalizeDocumentNumber } from '@/lib/auth/identity'
+import { parseLocalDateInput, toDateInputValue } from '@/lib/utils/localDate'
+import { missingProfileFields } from './dancerClaim.service'
 import { getDancerById } from './dancer.service'
 import { getDancerCurrentMemberships, getGroupById } from './group.service'
 import { getSchedulesByGroup } from './schedule.service'
 import { getMonthlyFeesByDancer, monthPayStatus, type MonthPayStatus } from './fee.service'
 import { getPaymentsByDancer } from './payment.service'
 import { getDancerCredit } from './credit.service'
-import { currentYearMonth } from '@/lib/utils/dates'
+import { currentYearMonth, dateToTs } from '@/lib/utils/dates'
 import type { DayOfWeek, FeeStatus, MonthlyFee, Payment } from '@/types'
 
 const DAY_ORDER: DayOfWeek[] = [
@@ -29,6 +35,8 @@ export interface PortalGroup {
   level: string
   teacher: string
   monthlyFee: number
+  /** false cuando es el segundo grupo de Doble Proceso: asiste y no se cobra. */
+  chargesFee: boolean
   monthStatus: FeeStatus | 'none'
   monthRemaining: number
   classes: PortalClass[]
@@ -39,9 +47,27 @@ export interface PortalTeacher {
   groups: string[]
 }
 
+export interface StudentProfile {
+  fullName: string
+  documentNumber: string
+  email: string
+  phone: string
+  birthDate: string
+  gender: string
+  address: string
+  neighborhood: string
+  commune: string
+  city: string
+  eps: string
+  epsLocation: string
+  bloodType: string
+  photoUrl: string | null
+}
+
 export interface StudentPortalData {
   fullName: string
   photoUrl: string | null
+  profile: StudentProfile
   groups: PortalGroup[]
   classes: PortalClass[]
   teachers: PortalTeacher[]
@@ -110,15 +136,17 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
       }))
       .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) || a.start.localeCompare(b.start))
 
+    const chargesFee = membership.chargesFee !== false
     return {
       id: membership.groupId,
       name: membership.groupName || group?.name || 'Grupo',
       modality: group?.modalityName || '',
       level: group?.levelName || '',
       teacher,
-      monthlyFee: membership.monthlyFeeSnapshot || group?.monthlyFee || 0,
-      monthStatus: groupMonthStatus(monthFees),
-      monthRemaining,
+      monthlyFee: chargesFee ? (membership.monthlyFeeSnapshot || group?.monthlyFee || 0) : 0,
+      chargesFee,
+      monthStatus: chargesFee ? groupMonthStatus(monthFees) : 'none',
+      monthRemaining: chargesFee ? monthRemaining : 0,
       classes: portalClasses,
     }
   }).sort((a, b) => a.name.localeCompare(b.name, 'es'))
@@ -146,6 +174,22 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
   return {
     fullName: dancer.fullName,
     photoUrl: dancer.photoUrl,
+    profile: {
+      fullName: dancer.fullName || '',
+      documentNumber: dancer.documentNumber || '',
+      email: dancer.email || '',
+      phone: dancer.phone || '',
+      birthDate: toDateInputValue(dancer.birthDate),
+      gender: dancer.gender || '',
+      address: dancer.address || '',
+      neighborhood: dancer.neighborhood || '',
+      commune: dancer.commune || '',
+      city: dancer.city || '',
+      eps: dancer.eps || '',
+      epsLocation: dancer.epsLocation || '',
+      bloodType: dancer.bloodType || '',
+      photoUrl: dancer.photoUrl,
+    },
     groups,
     classes,
     teachers,
@@ -160,6 +204,62 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
     currentBilled: currentFees.reduce((sum, fee) => sum + fee.amount, 0),
     olderDebt,
     totalDebt,
-    expectedMonthly: groups.reduce((sum, group) => sum + group.monthlyFee, 0),
+    expectedMonthly: groups.reduce((sum, group) => sum + (group.chargesFee ? group.monthlyFee : 0), 0),
+  }
+}
+
+export async function saveStudentProfile(dancerId: string, uid: string, input: StudentProfile): Promise<void> {
+  const fullName = input.fullName.trim()
+  if (fullName.length < 3) throw new Error('Escribe tu nombre completo.')
+  const phone = input.phone.trim()
+  if (phone.replace(/\D/g, '').length < 7) throw new Error('Escribe un celular válido.')
+
+  let birthDate = null
+  if (input.birthDate) {
+    const parsed = parseLocalDateInput(input.birthDate)
+    if (!parsed) throw new Error('La fecha de nacimiento no es válida.')
+    birthDate = dateToTs(parsed)
+  }
+
+  const photoUrl = input.photoUrl?.trim() ? input.photoUrl.trim() : null
+  await updateDoc(doc(db, COLLECTIONS.DANCERS, dancerId), {
+    fullName,
+    phone,
+    address: input.address.trim(),
+    neighborhood: input.neighborhood.trim(),
+    commune: input.commune.trim(),
+    city: input.city.trim(),
+    gender: input.gender,
+    eps: input.eps.trim(),
+    epsLocation: input.epsLocation.trim(),
+    bloodType: input.bloodType,
+    birthDate,
+    photoUrl,
+    authUid: uid,
+    updatedAt: serverTimestamp(),
+  })
+
+  try {
+    const fresh = await getDancerById(dancerId)
+    const cedula = normalizeDocumentNumber(fresh?.documentNumber)
+    if (!fresh || !cedula) return
+    const claimRef = doc(db, COLLECTIONS.DANCER_CLAIMS, cedula)
+    const claim = await getDoc(claimRef)
+    const missing = missingProfileFields(fresh)
+    if (claim.exists()) {
+      await setDoc(claimRef, { fullName, authUid: uid, missing }, { merge: true })
+    } else {
+      await setDoc(claimRef, {
+        email: (fresh.email || '').trim().toLowerCase(),
+        dancerId,
+        fullName,
+        isActive: fresh.isActive !== false,
+        documentKey: cedula,
+        authUid: uid,
+        missing,
+      })
+    }
+  } catch {
+    // The ficha is already saved. The signup index can be refreshed later.
   }
 }

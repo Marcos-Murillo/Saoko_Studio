@@ -79,7 +79,7 @@ export function DancerProfilePanel({
       <div className="flex gap-2 flex-wrap">
         {current.map(m => (
           <Badge key={m.id} style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: 'none' }}>
-            {m.groupName}
+            {m.groupName}{m.chargesFee === false ? ' · sin mensualidad' : ''}
           </Badge>
         ))}
       </div>

@@ -9,6 +9,7 @@ import { useToast } from '@/components/shared/Toast'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { isoToTs } from '@/lib/utils/dates'
 import { packDancerCategories, readCategoryIds } from '@/lib/utils/dancerCategories'
+import { persistSecondGroupChoice } from '@/lib/services/group.service'
 import { format } from 'date-fns'
 import type { Dancer, BloodType, Gender } from '@/types'
 
@@ -45,6 +46,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
         notes: data.notes,
         photoUrl: data.photoUrl || null,
       })
+      await persistSecondGroupChoice(id, data.fullName, cats, data.categoryIds, data.secondGroupId)
       toast('Bailarín actualizado correctamente')
       router.push(`/dancers/${id}`)
     } catch {
@@ -80,6 +82,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
           city: dancer.city ?? '',
           gender: dancer.gender ?? '',
           categoryIds: readCategoryIds(dancer),
+          secondGroupId: dancer.secondGroupId ?? '',
           notes: dancer.notes,
           photoUrl: dancer.photoUrl ?? '',
         }}

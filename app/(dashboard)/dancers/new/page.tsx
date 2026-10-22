@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { getCategories } from '@/lib/services/catalog.service'
 import { createDancer } from '@/lib/services/dancer.service'
+import { persistSecondGroupChoice } from '@/lib/services/group.service'
 import { DancerForm, type DancerFormData } from '@/components/dancers/DancerForm'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { useToast } from '@/components/shared/Toast'
@@ -27,6 +28,7 @@ export default function NewDancerPage() {
       inactiveDate: null, notes: data.notes,
       currentGroupId: null, currentGroupName: null, photoUrl: data.photoUrl || null,
     })
+    await persistSecondGroupChoice(id, data.fullName, cats, data.categoryIds, data.secondGroupId)
     toast('Bailarín creado correctamente')
     router.push(`/dancers/${id}`)
   }

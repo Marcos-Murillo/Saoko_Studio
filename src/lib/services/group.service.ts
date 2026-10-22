@@ -15,6 +15,9 @@ import {
 import { db } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { Group, GroupMembership } from '@/types'
+import { isDobleProcesoName } from '@/lib/utils/dancerCategories'
+
+const SECOND_GROUP_NOTE = 'Segundo grupo de Doble Proceso. No genera mensualidad.'
 
 async function syncDancerCurrentGroup(dancerId: string): Promise<void> {
   const current = await getDancerCurrentMemberships(dancerId)
@@ -137,6 +140,7 @@ export async function enrollDancer(
   groupName: string,
   monthlyFeeSnapshot: number,
   notes = '',
+  options?: { chargesFee?: boolean },
 ): Promise<string> {
   const existing = await getDocs(
     query(
@@ -146,8 +150,31 @@ export async function enrollDancer(
       where('isCurrent', '==', true),
     ),
   )
-  if (!existing.empty) return existing.docs[0].id
+  if (!existing.empty) {
+    const current = existing.docs[0]
+    const chargesNow = current.data().chargesFee !== false
+    if (options?.chargesFee === false && chargesNow) {
+      await updateDoc(current.ref, {
+        chargesFee: false,
+        notes: notes || SECOND_GROUP_NOTE,
+        updatedAt: serverTimestamp(),
+      })
+      const { removeUnpaidFeesForGroup } = await import('./fee.service')
+      await removeUnpaidFeesForGroup(dancerId, groupId)
+    } else if (options?.chargesFee === true && !chargesNow) {
+      await updateDoc(current.ref, {
+        chargesFee: true,
+        updatedAt: serverTimestamp(),
+      })
+      const { currentYearMonth } = await import('@/lib/utils/dates')
+      const { generateFeeForDancer } = await import('./fee.service')
+      const { year, month } = currentYearMonth()
+      await generateFeeForDancer(dancerId, dancerName, groupId, groupName, monthlyFeeSnapshot, year, month)
+    }
+    return current.id
+  }
 
+  const chargesFee = options?.chargesFee !== false
   const ref = await addDoc(collection(db, COLLECTIONS.GROUP_MEMBERSHIPS), {
     dancerId,
     dancerName,
@@ -157,7 +184,8 @@ export async function enrollDancer(
     endDate: null,
     isCurrent: true,
     monthlyFeeSnapshot,
-    notes,
+    chargesFee,
+    notes: chargesFee ? notes : (notes || SECOND_GROUP_NOTE),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
@@ -166,11 +194,83 @@ export async function enrollDancer(
     memberCount: increment(1),
     updatedAt: serverTimestamp(),
   })
-  const { currentYearMonth } = await import('@/lib/utils/dates')
-  const { generateFeeForDancer } = await import('./fee.service')
-  const { year, month } = currentYearMonth()
-  await generateFeeForDancer(dancerId, dancerName, groupId, groupName, monthlyFeeSnapshot, year, month)
+  if (chargesFee) {
+    const { currentYearMonth } = await import('@/lib/utils/dates')
+    const { generateFeeForDancer } = await import('./fee.service')
+    const { year, month } = currentYearMonth()
+    await generateFeeForDancer(dancerId, dancerName, groupId, groupName, monthlyFeeSnapshot, year, month)
+  }
   return ref.id
+}
+
+/**
+ * El segundo grupo de Doble Proceso queda activo y sin mensualidad.
+ * Sin grupo, se retira solo esa matrícula (la que no cobraba).
+ */
+export async function saveDancerSecondGroup(
+  dancerId: string,
+  dancerName: string,
+  secondGroup: { id: string; name: string; monthlyFee: number } | null,
+): Promise<void> {
+  const memberships = await getDancerCurrentMemberships(dancerId)
+  const free = memberships.filter(m => m.chargesFee === false)
+  const { removeUnpaidFeesForGroup } = await import('./fee.service')
+
+  if (!secondGroup) {
+    for (const m of free) {
+      await unenrollDancer(m.id, dancerId, m.groupId)
+      await removeUnpaidFeesForGroup(dancerId, m.groupId)
+    }
+    await updateDoc(doc(db, COLLECTIONS.DANCERS, dancerId), {
+      secondGroupId: null,
+      secondGroupName: null,
+      updatedAt: serverTimestamp(),
+    })
+    return
+  }
+
+  for (const m of free) {
+    if (m.groupId === secondGroup.id) continue
+    await unenrollDancer(m.id, dancerId, m.groupId)
+    await removeUnpaidFeesForGroup(dancerId, m.groupId)
+  }
+
+  await enrollDancer(
+    dancerId,
+    dancerName,
+    secondGroup.id,
+    secondGroup.name,
+    secondGroup.monthlyFee,
+    SECOND_GROUP_NOTE,
+    { chargesFee: false },
+  )
+  await updateDoc(doc(db, COLLECTIONS.DANCERS, dancerId), {
+    secondGroupId: secondGroup.id,
+    secondGroupName: secondGroup.name,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function persistSecondGroupChoice(
+  dancerId: string,
+  dancerName: string,
+  catalog: { id: string; name: string }[],
+  categoryIds: string[],
+  secondGroupId: string,
+): Promise<void> {
+  const doble = catalog.some(c => categoryIds.includes(c.id) && isDobleProcesoName(c.name))
+  if (!doble) {
+    await saveDancerSecondGroup(dancerId, dancerName, null)
+    return
+  }
+  const groups = await getGroups(true)
+  const group = groups.find(g => g.id === secondGroupId)
+  if (!group) throw new Error('Elige el segundo grupo al que asiste')
+  await saveDancerSecondGroup(dancerId, dancerName, {
+    id: group.id,
+    name: group.name,
+    monthlyFee: group.monthlyFee,
+  })
 }
 
 /**

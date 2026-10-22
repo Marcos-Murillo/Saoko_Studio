@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Search, UserX, MoreHorizontal, UserMinus, DollarSign, UserPlus, Download, Pencil, ChevronLeft, MousePointerClick, FolderInput, Tags } from 'lucide-react'
 import { getDancers, updateDancer, deactivateDancer, reactivateDancer } from '@/lib/services/dancer.service'
-import { getDancerCurrentMemberships, getGroups, enrollDancer, unenrollDancer } from '@/lib/services/group.service'
+import { getDancerCurrentMemberships, getGroups, enrollDancer, unenrollDancer, persistSecondGroupChoice, saveDancerSecondGroup } from '@/lib/services/group.service'
 import { getCategories } from '@/lib/services/catalog.service'
 import { registerPayment } from '@/lib/services/payment.service'
 import { getPaymentMethods } from '@/lib/services/catalog.service'
@@ -23,7 +23,7 @@ import { useToast } from '@/components/shared/Toast'
 import { FormField } from '@/components/shared/FormField'
 import { SaokoCombobox } from '@/components/shared/SaokoCombobox'
 import { formatDate, getAge, currentYearMonth, MONTHS_ES } from '@/lib/utils/dates'
-import { mergeCategory, packDancerCategories, readCategoryIds, readCategoryNames } from '@/lib/utils/dancerCategories'
+import { isDobleProcesoName, mergeCategory, packDancerCategories, readCategoryIds, readCategoryNames } from '@/lib/utils/dancerCategories'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -238,6 +238,7 @@ export default function DancersPage() {
   const [categories,        setCategories]         = useState<Category[]>([])
   const [bulkMode,          setBulkMode]           = useState<'group' | 'category' | null>(null)
   const [bulkValue,         setBulkValue]          = useState('')
+  const [bulkSecondGroup,   setBulkSecondGroup]    = useState('')
   const [bulkSaving,        setBulkSaving]         = useState(false)
 
   const load = async () => {
@@ -292,6 +293,7 @@ export default function DancersPage() {
       phone: data.phone, ...categories, notes: data.notes,
       photoUrl: data.photoUrl || null,
     })
+    await persistSecondGroupChoice(editing.id, data.fullName, cats, data.categoryIds, data.secondGroupId)
     toast('Bailarín actualizado')
     setEditing(null); load()
   }
@@ -307,7 +309,7 @@ export default function DancersPage() {
 
   /* Abre el modal de pago rápido cargando las membresías actuales */
   const openQuickPay = async (dancer: Dancer) => {
-    const memberships = await getDancerCurrentMemberships(dancer.id)
+    const memberships = (await getDancerCurrentMemberships(dancer.id)).filter(m => m.chargesFee !== false)
     setPayTarget({ dancer, memberships })
   }
 
@@ -351,6 +353,7 @@ export default function DancersPage() {
       return
     }
     setBulkValue('')
+    setBulkSecondGroup('')
     setBulkMode(mode)
   }
 
@@ -366,18 +369,40 @@ export default function DancersPage() {
         if (!group) throw new Error('Selecciona un grupo')
         for (const dancer of picked) {
           const memberships = await getDancerCurrentMemberships(dancer.id)
+          const targetWasFree = memberships.some(m => m.groupId === group.id && m.chargesFee === false)
           for (const membership of memberships) {
             if (membership.groupId === group.id) continue
+            if (membership.chargesFee === false) continue
             await unenrollDancer(membership.id, dancer.id, membership.groupId)
           }
-          await enrollDancer(dancer.id, dancer.fullName, group.id, group.name, group.monthlyFee)
+          await enrollDancer(
+            dancer.id,
+            dancer.fullName,
+            group.id,
+            group.name,
+            group.monthlyFee,
+            '',
+            targetWasFree ? { chargesFee: true } : undefined,
+          )
+          if (targetWasFree) await saveDancerSecondGroup(dancer.id, dancer.fullName, null)
         }
         toast(`${picked.length} bailarín${picked.length === 1 ? '' : 'es'} en ${group.name}`)
       } else {
         const category = categories.find(c => c.id === bulkValue)
         if (!category) throw new Error('Selecciona una categoría')
+        const addingDoble = isDobleProcesoName(category.name)
+        const second = allGroups.find(g => g.id === bulkSecondGroup)
+        if (addingDoble && !second) throw new Error('Elige el segundo grupo al que asiste')
         for (const dancer of picked) {
-          await updateDancer(dancer.id, mergeCategory(categories, readCategoryIds(dancer), category.id))
+          const packed = mergeCategory(categories, readCategoryIds(dancer), category.id)
+          await updateDancer(dancer.id, packed)
+          if (addingDoble && second) {
+            await saveDancerSecondGroup(dancer.id, dancer.fullName, {
+              id: second.id,
+              name: second.name,
+              monthlyFee: second.monthlyFee,
+            })
+          }
         }
         toast(`Categoría añadida a ${picked.length} bailarín${picked.length === 1 ? '' : 'es'}`)
       }
@@ -632,6 +657,7 @@ export default function DancersPage() {
           {editing && (
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
               <DancerForm
+                key={editing.id}
                 compact
                 defaultValues={{
                   fullName:       editing.fullName,
@@ -648,6 +674,7 @@ export default function DancersPage() {
                   city:           editing.city ?? '',
                   gender:         editing.gender ?? '',
                   categoryIds:    readCategoryIds(editing),
+                  secondGroupId:  editing.secondGroupId ?? '',
                   notes:          editing.notes,
                   photoUrl:       editing.photoUrl ?? '',
                 }}
@@ -728,7 +755,7 @@ export default function DancersPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={!!bulkMode} onOpenChange={v => { if (!v && !bulkSaving) { setBulkMode(null); setBulkValue('') } }}>
+      <Sheet open={!!bulkMode} onOpenChange={v => { if (!v && !bulkSaving) { setBulkMode(null); setBulkValue(''); setBulkSecondGroup('') } }}>
         <SheetContent side="right"
           style={{ background: 'rgba(18,18,18,.92)', backdropFilter: 'blur(24px)' }}>
           <SheetHeader>
@@ -740,8 +767,8 @@ export default function DancersPage() {
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
               {selected.size} bailarín{selected.size === 1 ? '' : 'es'} seleccionado{selected.size === 1 ? '' : 's'}.
               {bulkMode === 'group'
-                ? ' Salen de sus grupos actuales y quedan inscritos en el grupo que elijas.'
-                : ' Se suma a las categorías que ya tiene. No quita las anteriores ni cambia sus grupos.'}
+                ? ' Cambian el grupo que pagan. Si tienen Doble Proceso, el segundo grupo se mantiene.'
+                : ' Se suma a las categorías que ya tiene. Doble Proceso no cobra los dos grupos.'}
             </p>
             <FormField label={bulkMode === 'group' ? 'Grupo' : 'Categoría'} required>
               <SaokoCombobox
@@ -757,12 +784,26 @@ export default function DancersPage() {
                 placeholder={bulkMode === 'group' ? 'Seleccionar grupo...' : 'Seleccionar categoría...'}
               />
             </FormField>
+            {bulkMode === 'category' && categories.some(c => c.id === bulkValue && isDobleProcesoName(c.name)) && (
+              <FormField
+                label="Segundo grupo al que asiste"
+                required
+                hint="Asiste a este grupo y no se le cobra. Sigue pagando su grupo principal."
+              >
+                <SaokoCombobox
+                  options={allGroups.map(g => ({ value: g.id, label: g.name }))}
+                  value={bulkSecondGroup}
+                  onValueChange={setBulkSecondGroup}
+                  placeholder="Segunda Línea, Juvenil Intermedio..."
+                />
+              </FormField>
+            )}
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => { setBulkMode(null); setBulkValue('') }} disabled={bulkSaving}
+              <Button variant="outline" onClick={() => { setBulkMode(null); setBulkValue(''); setBulkSecondGroup('') }} disabled={bulkSaving}
                 style={{ background: 'transparent', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
                 Cancelar
               </Button>
-              <Button onClick={applyBulk} disabled={bulkSaving || !bulkValue}
+              <Button onClick={applyBulk} disabled={bulkSaving || !bulkValue || (categories.some(c => c.id === bulkValue && isDobleProcesoName(c.name)) && !bulkSecondGroup)}
                 style={{ background: 'linear-gradient(135deg,var(--gold-dark),var(--gold))', color: '#000', border: 'none' }}>
                 {bulkSaving ? 'Aplicando...' : 'Aplicar'}
               </Button>

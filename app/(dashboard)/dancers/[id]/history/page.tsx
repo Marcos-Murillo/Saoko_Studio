@@ -59,13 +59,13 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
                   <td style={{ fontWeight: 500 }} className="min-w-0"><span className="truncate block">{m.groupName}</span></td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{formatDate(m.startDate)}</td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{m.endDate ? formatDate(m.endDate) : '—'}</td>
-                  <td className="max-md:hidden" style={{ color: 'var(--gold)', fontWeight: 500 }}>{formatCurrency(m.monthlyFeeSnapshot)}</td>
+                  <td className="max-md:hidden" style={{ color: 'var(--gold)', fontWeight: 500 }}>{m.chargesFee === false ? 'Sin cobro' : formatCurrency(m.monthlyFeeSnapshot)}</td>
                   <td>{m.isCurrent ? <span className="badge-paid">Actual</span> : <span className="badge-pending">Histórico</span>}</td>
                   <td className="saoko-col-action">
                     <TableRowMenu details={[
                       { label: 'Inicio', value: formatDate(m.startDate) },
                       { label: 'Fin', value: m.endDate ? formatDate(m.endDate) : '—' },
-                      { label: 'Mensualidad', value: formatCurrency(m.monthlyFeeSnapshot) },
+                      { label: 'Mensualidad', value: m.chargesFee === false ? 'Sin cobro' : formatCurrency(m.monthlyFeeSnapshot) },
                     ]} />
                   </td>
                 </tr>

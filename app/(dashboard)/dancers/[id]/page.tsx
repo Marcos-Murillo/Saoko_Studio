@@ -126,7 +126,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {current.map(m => (
                     <Badge key={m.id} style={{ background: 'rgba(201,168,76,.14)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,.25)', fontSize: '0.75rem' }}>
-                      {m.groupName}
+                      {m.groupName}{m.chargesFee === false ? ' · sin mensualidad' : ''}
                     </Badge>
                   ))}
                 </div>
@@ -252,7 +252,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
             {memberships.slice(0, 4).map(m => (
               <div key={m.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{m.groupName}</p>
+                  <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{m.groupName}{m.chargesFee === false ? ' · sin mensualidad' : ''}</p>
                   <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
                     {formatDate(m.startDate)} {m.endDate ? `— ${formatDate(m.endDate)}` : '— presente'}
                   </p>

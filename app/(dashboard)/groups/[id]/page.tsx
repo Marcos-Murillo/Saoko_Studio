@@ -162,7 +162,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <div>
                   <p style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 500 }}>{m.dancerName}</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Desde {formatDate(m.startDate)}</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Desde {formatDate(m.startDate)}{m.chargesFee === false ? ' · sin mensualidad' : ''}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {canWrite && (

@@ -12,7 +12,7 @@ export default function CategoriesPage() {
   useEffect(() => { load() }, [])
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Categorías" description="Clasifican bailarines y grupos. Un bailarín puede tener varias, por ejemplo Adulto y Doble Proceso." />
+      <PageHeader title="Categorías" description="Clasifican bailarines y grupos. Doble Proceso se suma a otra categoría: el bailarín asiste a un segundo grupo y solo paga el principal." />
       <CatalogManager title="Categorías de Bailarines" items={items as any} loading={loading}
         onCreate={async (n, d) => { await createCategory({ name: n, description: d, isActive: true, minAge: null, maxAge: null, sortOrder: items.length }); load() }}
         onUpdate={async (id, n, d) => { await updateCategory(id, { name: n, description: d }); load() }}

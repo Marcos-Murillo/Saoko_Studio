@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { getCategories } from '@/lib/services/catalog.service'
+import { getGroups } from '@/lib/services/group.service'
+import { isDobleProcesoName } from '@/lib/utils/dancerCategories'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,7 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { FileUpload } from '@/components/ui/file-upload'
 import { PhotoLightbox } from '@/components/dancers/PhotoLightbox'
 import { compressLetterhead } from '@/lib/services/branding.service'
-import type { Category, BloodType } from '@/types'
+import type { BloodType, Category, Group } from '@/types'
 
 const schema = z.object({
   fullName:       z.string().min(2, 'Nombre requerido'),
@@ -32,6 +34,7 @@ const schema = z.object({
   city:           z.string().optional().default(''),
   gender:         z.string().optional().default(''),
   categoryIds:    z.array(z.string()).min(1, 'Selecciona al menos una categoría'),
+  secondGroupId:  z.string().optional().default(''),
   notes:          z.string().optional().default(''),
   photoUrl:       z.string().optional().default(''),
 })
@@ -73,32 +76,36 @@ export function DancerForm({
   compact?: boolean
 }) {
   const [categories,    setCategories]    = useState<Category[]>([])
+  const [groups,        setGroups]        = useState<Group[]>([])
   const [loadingCats,   setLoadingCats]   = useState(true)
   const [catsError,     setCatsError]     = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError,    setPhotoError]    = useState('')
 
   const {
-    register, handleSubmit, setValue, watch,
+    register, handleSubmit, setValue, watch, setError,
     formState: { errors, isSubmitting },
   } = useForm<DancerFormData>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
       fullName: '', documentNumber: '', birthDate: '', address: '',
       neighborhood: '', commune: '', eps: '', epsLocation: '', bloodType: '',
-      email: '', phone: '', city: '', gender: '', categoryIds: [], notes: '', photoUrl: '', ...defaultValues,
+      email: '', phone: '', city: '', gender: '', categoryIds: [], secondGroupId: '', notes: '', photoUrl: '', ...defaultValues,
     },
   })
 
   useEffect(() => {
     setLoadingCats(true)
     setCatsError(false)
-    getCategories()
-      .then(cats => { setCategories(cats); setLoadingCats(false) })
+    Promise.all([getCategories(), getGroups(true)])
+      .then(([cats, list]) => { setCategories(cats); setGroups(list); setLoadingCats(false) })
       .catch(() => { setCatsError(true); setLoadingCats(false) })
   }, [])
 
   const watchedCategories = watch('categoryIds')
+  const watchedSecondGroup = watch('secondGroupId')
+  const dobleCategory = categories.find(c => isDobleProcesoName(c.name))
+  const hasDoble = !!dobleCategory && (watchedCategories ?? []).includes(dobleCategory.id)
   const watchedGender   = watch('gender')
   const watchedBlood    = watch('bloodType')
   const watchedCommune  = watch('commune')
@@ -180,7 +187,7 @@ export function DancerForm({
             />
           </FormField>
           <FormField label="Categorías" required error={errors.categoryIds?.message}
-            hint={catsError ? 'No se pudieron cargar las categorías.' : 'Puedes marcar varias. Doble Proceso se suma a la categoría del grupo.'}>
+            hint={catsError ? 'No se pudieron cargar las categorías.' : 'Puedes marcar varias. Doble Proceso no cobra dos grupos: solo se paga el principal.'}>
             {loadingCats ? (
               <Skeleton className="h-8 w-full rounded-lg" style={{ background: 'var(--accent)' }} />
             ) : categories.length === 0 ? (
@@ -200,6 +207,9 @@ export function DancerForm({
                           const cur = watchedCategories ?? []
                           const next = checked ? cur.filter(id => id !== c.id) : [...cur, c.id]
                           setValue('categoryIds', next, { shouldValidate: true })
+                          if (dobleCategory && !next.includes(dobleCategory.id)) {
+                            setValue('secondGroupId', '')
+                          }
                         }}
                       />
                       {c.name}
@@ -209,6 +219,25 @@ export function DancerForm({
               </div>
             )}
           </FormField>
+          {hasDoble && (
+            <FormField
+              label="Segundo grupo al que asiste"
+              required
+              error={errors.secondGroupId?.message}
+              hint="Asiste a este grupo y no se le cobra. La mensualidad sigue siendo la del grupo principal."
+            >
+              <SaokoCombobox
+                options={groups.map(g => ({
+                  value: g.id,
+                  label: g.name,
+                  description: [g.modalityName, g.levelName].filter(Boolean).join(' · '),
+                }))}
+                value={watchedSecondGroup}
+                onValueChange={v => setValue('secondGroupId', v, { shouldValidate: true })}
+                placeholder="Juvenil Intermedio, Segunda Línea..."
+              />
+            </FormField>
+          )}
           <FormField label="Teléfono">
             <Input style={inputStyle} {...register('phone')} placeholder="3001234567" />
           </FormField>
@@ -304,7 +333,13 @@ export function DancerForm({
   )
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className={compact ? 'flex flex-col gap-3' : 'flex flex-col gap-4'}>
+    <form onSubmit={handleSubmit(async (data) => {
+      if (hasDoble && !data.secondGroupId) {
+        setError('secondGroupId', { message: 'Indica el segundo grupo' })
+        return
+      }
+      await onSubmit(data)
+    })} className={compact ? 'flex flex-col gap-3' : 'flex flex-col gap-4'}>
       <div className="grid items-stretch gap-4 md:grid-cols-[minmax(240px,0.85fr)_minmax(0,1.35fr)]">
         <div className="flex flex-col gap-4">
           {photoCard}

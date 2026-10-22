@@ -28,3 +28,18 @@ export function packDancerCategories(catalog: CategoryRef[], ids: string[]) {
 export function mergeCategory(catalog: Category[], currentIds: string[], addId: string) {
   return packDancerCategories(catalog, [...new Set([...currentIds, addId])])
 }
+
+export function normalizeCategoryName(name: string) {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+export function isDobleProcesoName(name: string) {
+  return normalizeCategoryName(name) === 'doble proceso'
+}
+
+export function selectionHasDobleProceso(
+  catalog: { id: string; name: string }[],
+  ids: string[],
+) {
+  return catalog.some(c => ids.includes(c.id) && isDobleProcesoName(c.name))
+}

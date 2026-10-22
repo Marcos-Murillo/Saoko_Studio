@@ -216,7 +216,7 @@ const CATEGORIES = [
   { name: 'Infantil', description: 'Niños y niñas pequeños (5–8 años)', minAge: 5, maxAge: 8, sortOrder: 1 },
   { name: 'Juvenil', description: 'Jóvenes (13–17 años)', minAge: 13, maxAge: 17, sortOrder: 3 },
   { name: 'Adulto', description: 'Adultos (18 años en adelante)', minAge: 18, maxAge: null, sortOrder: 4 },
-  { name: 'Doble Proceso', description: 'Bailarín de Primera Línea que también está en Segunda Línea. Se suma a su otra categoría.', minAge: null, maxAge: null, sortOrder: 5 },
+  { name: 'Doble Proceso', description: 'Asiste a un segundo grupo, además de su categoría. Ese segundo grupo no genera mensualidad.', minAge: null, maxAge: null, sortOrder: 5 },
 ]
 
 const MODALITIES = [
@@ -336,6 +336,9 @@ async function main() {
       categoryNames: cats,
       categoryId: ids[0] ?? '',
       categoryName: cats.join(', '),
+      ...(p.doble
+        ? { secondGroupId: groupId.get('Segunda Línea') ?? null, secondGroupName: 'Segunda Línea' }
+        : {}),
       isActive: true,
       currentGroupId: groupId.get(orderedGroups[0]) ?? null,
       currentGroupName: orderedGroups.join(', ') || null,
@@ -375,6 +378,7 @@ async function main() {
     for (const groupName of person.groups) {
       const gid = groupId.get(groupName)!
       const fee = GROUP_DEFS.find(g => g.name === groupName)!.monthlyFee
+      const chargesFee = !(person.doble && norm(groupName) === 'segunda linea')
       const already = memberships.some(m => m.dancerId === id && m.groupId === gid && m.isCurrent === true)
       if (already) continue
       await db.collection('groupMemberships').add({
@@ -386,7 +390,10 @@ async function main() {
         endDate: null,
         isCurrent: true,
         monthlyFeeSnapshot: fee,
-        notes: 'Migrado desde Excel Saoko 2026',
+        chargesFee,
+        notes: chargesFee
+          ? 'Migrado desde Excel Saoko 2026'
+          : 'Segundo grupo de Doble Proceso. No genera mensualidad.',
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })
