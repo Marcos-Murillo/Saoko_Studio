@@ -9,7 +9,7 @@ import {
 import { db } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import { normalizeDocumentNumber } from '@/lib/auth/identity'
-import { toMillis } from '@/lib/utils/dates'
+import { isUnderage, toMillis } from '@/lib/utils/dates'
 import type { Dancer } from '@/types'
 
 export const PROFILE_FIELDS = [
@@ -73,6 +73,8 @@ export async function writeDancerClaim(dancer: ClaimSource): Promise<void> {
     isActive: dancer.isActive !== false,
     documentKey,
     missing: missingProfileFields(dancer),
+    minor: isUnderage(dancer.birthDate),
+    birthMillis: toMillis(dancer.birthDate) || null,
   }
   if (dancer.authUid) payload.authUid = dancer.authUid
 

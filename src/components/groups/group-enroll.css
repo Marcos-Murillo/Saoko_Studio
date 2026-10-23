@@ -1,0 +1,23 @@
+.nexora-group-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(240, 234, 214, 0.28);
+  background: #121212;
+}
+
+.nexora-bell .bell-toggle__button {
+  border: 1px solid rgba(240, 234, 214, 0.28);
+}
+
+.nexora-bell[data-on='true'] .bell-toggle__button,
+.nexora-bell[data-on='true'] .bell-toggle__button:enabled:hover {
+  background: linear-gradient(180deg, #e8c97a, #c9a84c);
+  color: #0c0c0c;
+  border-color: transparent;
+}

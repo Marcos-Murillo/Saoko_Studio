@@ -105,6 +105,14 @@ export function getAge(birthDate: unknown): number {
   return age
 }
 
+export function isUnderage(birthDate: unknown, adultAt = 18): boolean {
+  const d = tsToDate(birthDate)
+  if (!d || d.getFullYear() < 1920) return false
+  const age = differenceInYears(new Date(), d)
+  if (age < 0 || age > 120) return false
+  return age < adultAt
+}
+
 export function formatAge(birthDate: unknown): string {
   const d = tsToDate(birthDate)
   if (!d || d.getFullYear() < 1920) return ''

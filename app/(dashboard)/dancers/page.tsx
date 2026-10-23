@@ -624,12 +624,14 @@ export default function DancersPage() {
                             <DollarSign size={14} className="mr-2" />
                             Registrar pago mensualidad
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            style={{ color: 'var(--foreground)', cursor: 'pointer' }}
-                            onClick={() => setAddGroupTarget(d)}>
-                            <UserPlus size={14} className="mr-2" />
-                            Añadir a otro grupo
-                          </DropdownMenuItem>
+                          {adminUser && PERMISSIONS.canManageUsers(adminUser.role) && (
+                            <DropdownMenuItem
+                              style={{ color: 'var(--foreground)', cursor: 'pointer' }}
+                              onClick={() => setAddGroupTarget(d)}>
+                              <UserPlus size={14} className="mr-2" />
+                              Añadir a grupo
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator style={{ background: 'var(--border)' }} />
                           <DropdownMenuItem
                             style={{ color: d.isActive ? '#e05252' : '#4caf7d', cursor: 'pointer' }}

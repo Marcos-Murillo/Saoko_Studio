@@ -10,6 +10,7 @@ import { formatDate, formatMonth } from '@/lib/utils/dates'
 import type { FeeStatus } from '@/types'
 import type { PortalClass, PortalGroup, StudentPortalData, StudentProfile } from '@/lib/services/portal.service'
 import { StudentProfileForm } from '@/components/portal/StudentProfileForm'
+import { GroupEnrollMenu } from '@/components/groups/GroupEnrollMenu'
 
 type Tab = 'inicio' | 'grupos' | 'horario' | 'pagos' | 'perfil'
 
@@ -55,10 +56,12 @@ export function StudentHome({
   data,
   onSignOut,
   onSaveProfile,
+  onEnrollGroups,
 }: {
   data: StudentPortalData
   onSignOut: () => void
   onSaveProfile: (input: StudentProfile) => Promise<void>
+  onEnrollGroups: (groupIds: string[]) => Promise<void>
 }) {
   const [tab, setTab] = useState<Tab>('inicio')
   const [hidden, setHidden] = useState(false)
@@ -157,7 +160,9 @@ export function StudentHome({
 
           {tab !== 'perfil' && tab === 'inicio' && nextClass && <NextClassBanner item={nextClass} today={today} />}
 
-          {tab === 'grupos' && <GroupsBlock groups={data.groups} hidden={hidden} />}
+          {tab === 'grupos' && (
+            <GroupsBlock groups={data.groups} hidden={hidden} onEnrollGroups={onEnrollGroups} />
+          )}
 
           {tab !== 'perfil' && (tab === 'inicio' || tab === 'horario') && (
             <ScheduleBlock classes={data.classes} today={today} />
@@ -302,12 +307,90 @@ function MonthAside({ data, month, hidden }: { data: StudentPortalData; month: s
   )
 }
 
-function GroupsBlock({ groups, hidden }: { groups: PortalGroup[]; hidden: boolean }) {
+function GroupsBlock({
+  groups, hidden, onEnrollGroups,
+}: {
+  groups: PortalGroup[]
+  hidden: boolean
+  onEnrollGroups: (groupIds: string[]) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [catalog, setCatalog] = useState<Array<{ id: string; name: string; monthlyFee: number; detail: string }>>([])
+  const [picked, setPicked] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [loadingList, setLoadingList] = useState(false)
+  const [error, setError] = useState('')
+
+  const openPicker = async () => {
+    setError('')
+    setLoadingList(true)
+    setOpen(true)
+    try {
+      const { getGroups } = await import('@/lib/services/group.service')
+      const list = await getGroups(true)
+      const joined = new Set(groups.map(group => group.id))
+      setCatalog(list.filter(group => !joined.has(group.id)).map(group => ({
+        id: group.id,
+        name: group.name,
+        monthlyFee: group.monthlyFee,
+        detail: [group.modalityName, group.levelName].filter(Boolean).join(' · '),
+      })))
+    } catch {
+      setError('No pudimos cargar los grupos.')
+    } finally {
+      setLoadingList(false)
+    }
+  }
+
+  const enroll = async () => {
+    if (picked.length === 0) {
+      setError('Elige al menos un grupo.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await onEnrollGroups(picked)
+      setPicked([])
+      setOpen(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo completar la inscripción.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section>
-      <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Tus grupos</h2>
+      <div className="mb-4">
+        <GroupEnrollMenu
+          title={<h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Tus grupos</h2>}
+          buttonLabel="Inscribirme a grupo"
+          buttonAlign="end"
+          groups={catalog.map(group => ({ id: group.id, name: group.name, feeLabel: money(group.monthlyFee, hidden) }))}
+          selected={picked}
+          onToggle={id => setPicked(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])}
+          open={open}
+          onOpenChange={next => { setOpen(next); if (next) void openPicker() }}
+          error={error}
+          loading={loadingList}
+          note="Elige el grupo o los grupos. La inscripción queda igual en el panel del estudio."
+          emptyText="Ya estás en todos los grupos activos."
+          disabled={busy}
+          footer={(
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setPicked([]); setOpen(false) }} className="rounded-full px-4 py-2 text-xs font-semibold text-[#a09070]" style={{ background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button type="button" disabled={busy || picked.length === 0} onClick={enroll} className="rounded-full px-4 py-2 text-xs font-bold" style={{ background: 'linear-gradient(180deg, var(--gold-light), var(--gold))', color: '#0c0c0c', border: 'none', cursor: 'pointer', opacity: busy || picked.length === 0 ? 0.7 : 1 }}>
+                {busy ? 'Inscribiendo...' : 'Confirmar inscripción'}
+              </button>
+            </div>
+          )}
+        />
+      </div>
       {groups.length === 0 ? (
-        <Empty text="Todavía no estás inscrito en un grupo. Cuando el estudio te agregue, aparece aquí con tu mensualidad y tu profesor." />
+        <Empty text="Todavía no estás inscrito. Usa Inscribirme a grupo para elegir tu clase." />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {groups.map(group => (

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { getStudentPortal, saveStudentProfile, type StudentPortalData, type StudentProfile } from '@/lib/services/portal.service'
+import { enrollStudentInGroups } from '@/lib/services/registration.service'
 import { StudentHome } from '@/components/portal/StudentHome'
 
 export default function StudentSpacePage() {
@@ -46,5 +47,18 @@ export default function StudentSpacePage() {
     setData(await getStudentPortal(adminUser.dancerId))
   }
 
-  return <StudentHome data={data} onSignOut={() => signOut()} onSaveProfile={saveProfile} />
+  const enrollGroups = async (groupIds: string[]) => {
+    if (!adminUser.dancerId) throw new Error('Tu sesión no está lista.')
+    await enrollStudentInGroups(adminUser.dancerId, data.fullName, groupIds)
+    setData(await getStudentPortal(adminUser.dancerId))
+  }
+
+  return (
+    <StudentHome
+      data={data}
+      onSignOut={() => signOut()}
+      onSaveProfile={saveProfile}
+      onEnrollGroups={enrollGroups}
+    />
+  )
 }

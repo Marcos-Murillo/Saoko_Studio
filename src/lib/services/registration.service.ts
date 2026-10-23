@@ -19,7 +19,7 @@ import {
 import { db, getFirebaseAuth } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import { isDocumentNumber, normalizeDocumentNumber } from '@/lib/auth/identity'
-import { dateToTs } from '@/lib/utils/dates'
+import { dateToTs, isUnderage } from '@/lib/utils/dates'
 import type { ProfileFieldKey } from './dancerClaim.service'
 
 export type RegistrationLookup =
@@ -28,7 +28,14 @@ export type RegistrationLookup =
   | { kind: 'mismatch' }
   | { kind: 'inactive'; fullName: string }
   | { kind: 'claimed'; fullName: string }
-  | { kind: 'claim'; fullName: string; dancerId: string; missing: ProfileFieldKey[] }
+  | { kind: 'claim'; fullName: string; dancerId: string; missing: ProfileFieldKey[]; minor: boolean }
+
+export type StudentGuardianInput = {
+  fullName: string
+  relationship: string
+  phone: string
+  documentNumber: string
+}
 
 function errorCode(error: unknown): string {
   return (error as { code?: string }).code || ''
@@ -121,7 +128,39 @@ export async function lookupRegistration(email: string, documentNumber: string):
     fullName,
     dancerId: String(data.dancerId),
     missing,
+    minor: isUnderage(data.birthMillis) || data.minor === true,
   }
+}
+
+export async function enrollStudentInGroups(dancerId: string, dancerName: string, groupIds: string[]): Promise<void> {
+  const ids = [...new Set(groupIds.map(id => id.trim()).filter(Boolean))]
+  if (ids.length === 0) throw new Error('Elige al menos un grupo.')
+  const { getGroups, enrollDancer } = await import('./group.service')
+  const groups = await getGroups(true)
+  for (const id of ids) {
+    const group = groups.find(item => item.id === id)
+    if (!group) throw new Error('Uno de los grupos ya no está disponible.')
+    await enrollDancer(dancerId, dancerName, group.id, group.name, group.monthlyFee, 'Inscripción del estudiante')
+  }
+}
+
+async function saveStudentGuardian(dancerId: string, dancerName: string, guardian: StudentGuardianInput): Promise<void> {
+  const fullName = guardian.fullName.trim()
+  const relationship = guardian.relationship.trim()
+  const phone = guardian.phone.trim()
+  if (fullName.length < 3) throw new Error('Escribe el nombre del acudiente.')
+  if (!relationship) throw new Error('Indica el parentesco del acudiente.')
+  if (phone.replace(/\D/g, '').length < 7) throw new Error('Escribe el celular del acudiente.')
+  const { createGuardian, linkGuardianToDancer } = await import('./dancer.service')
+  const guardianId = await createGuardian({
+    fullName,
+    documentNumber: guardian.documentNumber.trim(),
+    phone,
+    email: '',
+    address: '',
+    notes: '',
+  })
+  await linkGuardianToDancer(dancerId, guardianId, relationship, true, dancerName, fullName)
 }
 
 const PENDING_KEY = 'saoko.pendingStudent'
@@ -279,10 +318,13 @@ export async function registerClaimedDancer(input: {
   fullName: string
   missing: ProfileFieldKey[]
   fields: Partial<Record<ProfileFieldKey, string>>
+  groupIds: string[]
+  guardian?: StudentGuardianInput | null
 }): Promise<void> {
   const email = input.email.trim().toLowerCase()
   const cedula = normalizeDocumentNumber(input.documentNumber)
   assertPassword(input.password, cedula)
+  if (input.groupIds.length === 0) throw new Error('Elige al menos un grupo.')
   rememberPendingStudent({
     dancerId: input.dancerId,
     cedula,
@@ -310,6 +352,8 @@ export async function registerClaimedDancer(input: {
       authUid: uid,
       missing: [],
     }, { merge: true })
+    await enrollStudentInGroups(input.dancerId, input.fullName, input.groupIds)
+    if (input.guardian) await saveStudentGuardian(input.dancerId, input.fullName, input.guardian)
   } catch (error) {
     throw publicError(error, 'No se pudo activar tu cuenta. Vuelve a intentarlo con el correo y la cédula de tu ficha.')
   }
@@ -324,6 +368,8 @@ export async function registerNewStudent(input: {
   address: string
   city: string
   password: string
+  groupIds: string[]
+  guardian?: StudentGuardianInput | null
 }): Promise<void> {
   const email = input.email.trim().toLowerCase()
   const cedula = normalizeDocumentNumber(input.documentNumber)
@@ -331,6 +377,7 @@ export async function registerNewStudent(input: {
   const phone = input.phone.trim()
   if (fullName.length < 3) throw new Error('Escribe tu nombre completo.')
   if (phone.replace(/\D/g, '').length < 7) throw new Error('Escribe un celular válido.')
+  if (input.groupIds.length === 0) throw new Error('Elige al menos un grupo.')
   assertPassword(input.password, cedula)
 
   const claim = await getDoc(doc(db, COLLECTIONS.DANCER_CLAIMS, cedula))
@@ -387,7 +434,10 @@ export async function registerNewStudent(input: {
       documentKey: cedula,
       authUid: uid,
       missing: [],
+      minor: isUnderage(input.birthDate),
     })
+    await enrollStudentInGroups(dancerId, fullName, input.groupIds)
+    if (input.guardian) await saveStudentGuardian(dancerId, fullName, input.guardian)
   } catch (error) {
     throw publicError(error, 'No se pudo crear tu cuenta. Recarga e inténtalo de nuevo.')
   }

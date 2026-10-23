@@ -226,27 +226,49 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'authUid', 'fullName', 'phone', 'address', 'neighborhood', 'commune', 'city',
           'birthDate', 'gender', 'eps', 'epsLocation', 'bloodType', 'photoUrl',
-          'email', 'documentKey', 'updatedAt'
+          'email', 'documentKey', 'currentGroupId', 'currentGroupName', 'updatedAt'
         ])
       );
       allow delete: if isOps();
     }
     match /guardians/{id} {
       allow read: if isInternal();
-      allow write: if isOps();
+      allow create: if isOps() || (
+        isStudent()
+        && request.resource.data.fullName is string
+        && request.resource.data.fullName.size() >= 3
+        && request.resource.data.phone is string
+      );
+      allow update, delete: if isOps();
     }
     match /dancerGuardians/{id} {
-      allow read: if isInternal();
-      allow write: if isOps();
+      allow read: if isInternal() || (isStudent() && resource.data.dancerId == myDancerId());
+      allow create: if isOps() || (
+        isStudent()
+        && request.resource.data.dancerId == myDancerId()
+        && request.resource.data.relationship is string
+        && request.resource.data.guardianId is string
+      );
+      allow update, delete: if isOps();
     }
 
     match /groups/{id} {
-      allow read: if isActiveUser();
-      allow write: if isOps();
+      allow read: if true;
+      allow create, delete: if isOps();
+      allow update: if isOps() || (
+        isStudent()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+      );
     }
     match /groupMemberships/{id} {
       allow read: if isInternal() || (isStudent() && resource.data.dancerId == myDancerId());
-      allow write: if isOps();
+      allow create: if isOps() || (
+        isStudent()
+        && request.resource.data.dancerId == myDancerId()
+        && request.resource.data.isCurrent == true
+        && request.resource.data.groupId is string
+      );
+      allow update, delete: if isOps();
     }
     match /schedules/{id} {
       allow read: if isActiveUser();
@@ -255,7 +277,13 @@ service cloud.firestore {
 
     match /monthlyFees/{id} {
       allow read: if isOps() || (isStudent() && resource.data.dancerId == myDancerId());
-      allow write: if isOps();
+      allow create: if isOps() || (
+        isStudent()
+        && request.resource.data.dancerId == myDancerId()
+        && request.resource.data.amountPaid == 0
+        && request.resource.data.status == 'pending'
+      );
+      allow update, delete: if isOps();
     }
     match /payments/{id} {
       allow read: if isOps() || (isStudent() && resource.data.dancerId == myDancerId());
