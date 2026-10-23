@@ -51,7 +51,7 @@ export default function EditGroupPage({ params }: { params: Promise<{ id: string
         Editando: <strong style={{ color: 'var(--text-primary)' }}>{group.name}</strong>
         <br />
         <span style={{ color: 'var(--status-partial)', fontSize: '0.8rem' }}>
-          ⚠ Cambiar la mensualidad no afecta las mensualidades ya generadas — solo las futuras.
+          El nombre y el precio se aplican a matrículas vigentes y a cuotas de este mes (o futuras) que aún no tengan abono. Las cuotas ya pagadas o con abono no cambian.
         </span>
       </p>
       <GroupForm

@@ -11,7 +11,7 @@ import { ActiveBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { useToast } from '@/components/shared/Toast'
-import { formatDate, getAge } from '@/lib/utils/dates'
+import { formatDate, formatAge, getAge } from '@/lib/utils/dates'
 import { readCategoryNames } from '@/lib/utils/dancerCategories'
 import { formatCurrency } from '@/lib/utils/currency'
 import { Button } from '@/components/ui/button'
@@ -114,8 +114,8 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
                       {name}
                     </Badge>
                   ))}
-                  {dancer.birthDate && (
-                    <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{getAge(dancer.birthDate)} años</span>
+                  {formatAge(dancer.birthDate) && (
+                    <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{formatAge(dancer.birthDate)}</span>
                   )}
                   {(credit?.balance ?? 0) > 0 && (
                     <Badge variant="outline" style={{ color: '#4a90d9', borderColor: 'rgba(74,144,217,.35)', background: 'rgba(74,144,217,.1)', fontSize: '0.72rem' }}>
@@ -190,6 +190,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
           <CardContent className="pt-4">
             <InfoRow icon={Calendar} label="Cédula"              value={dancer.documentNumber} />
             <InfoRow icon={Calendar} label="Fecha de nacimiento" value={formatDate(dancer.birthDate)} />
+            <InfoRow icon={Calendar} label="Edad" value={formatAge(dancer.birthDate)} />
             <InfoRow icon={Calendar} label="Género"              value={dancer.gender} />
             <InfoRow icon={MapPin}   label="Ciudad"              value={dancer.city} />
             <InfoRow icon={Calendar} label="Categorías"          value={readCategoryNames(dancer).join(', ')} />

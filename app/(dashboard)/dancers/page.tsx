@@ -22,7 +22,8 @@ import { LinkButton } from '@/components/shared/LinkButton'
 import { useToast } from '@/components/shared/Toast'
 import { FormField } from '@/components/shared/FormField'
 import { SaokoCombobox } from '@/components/shared/SaokoCombobox'
-import { formatDate, getAge, currentYearMonth, MONTHS_ES } from '@/lib/utils/dates'
+import { formatDate, formatAge, getAge, currentYearMonth, MONTHS_ES } from '@/lib/utils/dates'
+import { toDateInputValue } from '@/lib/utils/localDate'
 import { isDobleProcesoName, mergeCategory, packDancerCategories, readCategoryIds, readCategoryNames } from '@/lib/utils/dancerCategories'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -560,7 +561,7 @@ export default function DancersPage() {
                       {d.documentNumber || '—'}
                     </TableCell>
                     <TableCell className="max-md:hidden text-sm" style={{ color: 'var(--muted-foreground)' }}>
-                      {d.birthDate ? `${getAge(d.birthDate)} años` : '—'}
+                      {formatAge(d.birthDate) || '—'}
                     </TableCell>
                     <TableCell className="max-md:hidden">
                       {readCategoryNames(d).length > 0
@@ -662,7 +663,7 @@ export default function DancersPage() {
                 defaultValues={{
                   fullName:       editing.fullName,
                   documentNumber: editing.documentNumber,
-                  birthDate:      editing.birthDate ? new Date(editing.birthDate.toDate()).toISOString().split('T')[0] : '',
+                  birthDate:      toDateInputValue(editing.birthDate),
                   address:        editing.address,
                   neighborhood:   editing.neighborhood,
                   commune:        editing.commune,

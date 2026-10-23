@@ -3,12 +3,12 @@
  * Core business logic for monthly fee generation and management.
  *
  * KEY RULES:
- * 1. `amount` in each MonthlyFee document is a SNAPSHOT — it never changes
- *    even if the group price changes later.
- * 2. Inactive dancers do NOT get new fees.
- * 3. If a dancer has credit, it is applied automatically on generation.
- * 4. Duplicate fees for same (dancer, group, year, month) are prevented.
- * 5. A membership with chargesFee === false does not generate a fee.
+ * 1. Paid or partially paid fees keep the amount that was billed (history).
+ * 2. Unpaid current/future fees follow the live group name and monthlyFee.
+ * 3. Inactive dancers do NOT get new fees. Missing or inactive groups do not bill.
+ * 4. If a dancer has credit, it is applied automatically on generation.
+ * 5. Duplicate fees for same (dancer, group, year, month) are prevented.
+ * 6. A membership with chargesFee === false does not generate a fee.
  *    Doble Proceso adds a second group the dancer attends, but only the main group is billed.
  */
 import {
@@ -27,7 +27,7 @@ import {
 import { db } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import { monthStart, currentYearMonth } from '@/lib/utils/dates'
-import type { MonthlyFee, FeeStatus } from '@/types'
+import type { Group, MonthlyFee, FeeStatus } from '@/types'
 import { applyCreditsToFee } from './credit.service'
 import { logAudit } from './audit.service'
 
@@ -140,6 +140,14 @@ export async function generateFeeForDancer(
     ),
   )
   if (!existing.empty) {
+    const current = snapToEntity<MonthlyFee>(existing.docs[0])
+    if (isOpenFee(current) && (current.amount !== monthlyFeeAmount || current.groupName !== groupName)) {
+      await updateDoc(existing.docs[0].ref, {
+        amount: monthlyFeeAmount,
+        groupName,
+        updatedAt: serverTimestamp(),
+      })
+    }
     return { feeId: existing.docs[0].id, wasExisting: true }
   }
 
@@ -152,7 +160,7 @@ export async function generateFeeForDancer(
     groupName,
     periodYear: year,
     periodMonth: month,
-    amount: monthlyFeeAmount,   // SNAPSHOT — never modified retroactively
+    amount: monthlyFeeAmount,
     amountPaid: 0,
     status: 'pending' as FeeStatus,
     dueDate,
@@ -165,6 +173,91 @@ export async function generateFeeForDancer(
   await applyCreditsToFee(dancerId, ref.id, monthlyFeeAmount)
 
   return { feeId: ref.id, wasExisting: false }
+}
+
+function isOpenFee(fee: MonthlyFee): boolean {
+  return (fee.amountPaid ?? 0) === 0 && fee.status !== 'paid' && fee.status !== 'forgiven'
+}
+
+function isCurrentOrFutureFee(fee: MonthlyFee, year: number, month: number): boolean {
+  return fee.periodYear > year || (fee.periodYear === year && fee.periodMonth >= month)
+}
+
+export async function syncOpenFeesForGroup(group: Group): Promise<void> {
+  const { year, month } = currentYearMonth()
+  const snap = await getDocs(
+    query(collection(db, COLLECTIONS.MONTHLY_FEES), where('groupId', '==', group.id)),
+  )
+  for (const feeDoc of snap.docs) {
+    const fee = snapToEntity<MonthlyFee>(feeDoc)
+    if (!isOpenFee(fee) || !isCurrentOrFutureFee(fee, year, month)) continue
+    if (group.isActive === false) {
+      await deleteDoc(feeDoc.ref)
+      continue
+    }
+    if (fee.amount === group.monthlyFee && fee.groupName === group.name) continue
+    await updateDoc(feeDoc.ref, {
+      amount: group.monthlyFee,
+      groupName: group.name,
+      updatedAt: serverTimestamp(),
+    })
+  }
+}
+
+/** Alinea caja con grupos reales: quita huérfanos y actualiza nombre/precio vivos. */
+export async function reconcileOpenFeesWithGroups(): Promise<void> {
+  const [groupsSnap, membershipsSnap, feesSnap] = await Promise.all([
+    getDocs(collection(db, COLLECTIONS.GROUPS)),
+    getDocs(query(collection(db, COLLECTIONS.GROUP_MEMBERSHIPS), where('isCurrent', '==', true))),
+    getDocs(collection(db, COLLECTIONS.MONTHLY_FEES)),
+  ])
+  const groups = new Map(groupsSnap.docs.map(d => [d.id, snapToEntity<Group>(d)]))
+  const { year, month } = currentYearMonth()
+  const { unenrollDancer, syncDancerCurrentGroup } = await import('./group.service')
+  const dancersToSync = new Set<string>()
+
+  for (const membershipDoc of membershipsSnap.docs) {
+    const membership = membershipDoc.data()
+    const groupId = String(membership.groupId ?? '')
+    const dancerId = String(membership.dancerId ?? '')
+    const group = groups.get(groupId)
+    if (!group) {
+      await unenrollDancer(membershipDoc.id, dancerId, groupId)
+      await removeUnpaidFeesForGroup(dancerId, groupId)
+      continue
+    }
+    const patch: Record<string, unknown> = { updatedAt: serverTimestamp() }
+    if (membership.groupName !== group.name) patch.groupName = group.name
+    if (membership.monthlyFeeSnapshot !== group.monthlyFee) patch.monthlyFeeSnapshot = group.monthlyFee
+    if (Object.keys(patch).length > 1) {
+      await updateDoc(membershipDoc.ref, patch)
+      dancersToSync.add(dancerId)
+    }
+  }
+  for (const dancerId of dancersToSync) {
+    await syncDancerCurrentGroup(dancerId)
+  }
+
+  for (const feeDoc of feesSnap.docs) {
+    const fee = snapToEntity<MonthlyFee>(feeDoc)
+    if (!isOpenFee(fee)) continue
+    const group = groups.get(fee.groupId)
+    if (!group) {
+      await deleteDoc(feeDoc.ref)
+      continue
+    }
+    if (group.isActive === false && isCurrentOrFutureFee(fee, year, month)) {
+      await deleteDoc(feeDoc.ref)
+      continue
+    }
+    if (!isCurrentOrFutureFee(fee, year, month)) continue
+    if (fee.amount === group.monthlyFee && fee.groupName === group.name) continue
+    await updateDoc(feeDoc.ref, {
+      amount: group.monthlyFee,
+      groupName: group.name,
+      updatedAt: serverTimestamp(),
+    })
+  }
 }
 
 /** Quita cuotas sin abono de un grupo que ya no se cobra. */
@@ -201,9 +294,18 @@ export async function generateMonthlyFees(
   let created = 0
   let skipped = 0
 
+  const groupsSnap = await getDocs(collection(db, COLLECTIONS.GROUPS))
+  const groups = new Map(groupsSnap.docs.map(d => [d.id, snapToEntity<Group>(d)]))
+
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
     if (membership.chargesFee === false) {
+      skipped++
+      continue
+    }
+
+    const group = groups.get(String(membership.groupId ?? ''))
+    if (!group || group.isActive === false) {
       skipped++
       continue
     }
@@ -219,8 +321,8 @@ export async function generateMonthlyFees(
       membership.dancerId as string,
       membership.dancerName as string,
       membership.groupId as string,
-      membership.groupName as string,
-      membership.monthlyFeeSnapshot as number,
+      group.name,
+      group.monthlyFee,
       year,
       month,
     )
@@ -259,12 +361,15 @@ export async function ensureDancerMonthFees(
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
     if (membership.chargesFee === false) continue
+    const groupSnap = await getDoc(doc(db, COLLECTIONS.GROUPS, membership.groupId as string))
+    if (!groupSnap.exists() || groupSnap.data().isActive === false) continue
+    const group = snapToEntity<Group>(groupSnap)
     await generateFeeForDancer(
       dancerId,
       (membership.dancerName as string) ?? (dancerSnap.data().fullName as string),
       membership.groupId as string,
-      membership.groupName as string,
-      membership.monthlyFeeSnapshot as number,
+      group.name,
+      group.monthlyFee,
       y,
       m,
     )
@@ -281,6 +386,8 @@ export async function ensureCurrentMonthFees(
   actor?: { id: string; name: string },
 ): Promise<{ created: number; skipped: number }> {
   const { year, month } = currentYearMonth()
+  await reconcileOpenFeesWithGroups()
+
   const cacheKey = `saoko-fees-${year}-${month}`
   try {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(cacheKey) === '1') {

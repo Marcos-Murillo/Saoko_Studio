@@ -23,8 +23,48 @@ export function toMillis(value: unknown): number {
   return 0
 }
 
+function excelSerialToDate(serial: number): Date | null {
+  if (!Number.isFinite(serial) || serial < 20000 || serial > 80000) return null
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000)
+  return isValid(d) ? new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12) : null
+}
+
+function parseBirthString(raw: string): Date | null {
+  const value = raw.trim()
+  if (!value) return null
+  const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) {
+    const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12)
+    return isValid(d) ? d : null
+  }
+  const dmy = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+  if (dmy) {
+    let day = Number(dmy[1])
+    let month = Number(dmy[2])
+    let year = Number(dmy[3])
+    if (year < 100) year += year <= 30 ? 2000 : 1900
+    if (day <= 12 && month > 12) {
+      const tmp = day
+      day = month
+      month = tmp
+    }
+    const d = new Date(year, month - 1, day, 12)
+    return isValid(d) && d.getDate() === day ? d : null
+  }
+  const parsed = new Date(value)
+  return isValid(parsed) ? parsed : null
+}
+
 export function tsToDate(ts: Timestamp | Date | null | undefined): Date | null {
-  if (!ts) return null
+  if (ts == null || ts === '') return null
+  if (typeof ts === 'number') {
+    const fromExcel = excelSerialToDate(ts)
+    if (fromExcel) return fromExcel
+  }
+  if (typeof ts === 'string') {
+    const fromText = parseBirthString(ts)
+    if (fromText) return fromText
+  }
   const ms = toMillis(ts)
   if (!ms) return null
   const d = new Date(ms)
@@ -57,10 +97,20 @@ export function formatMonthShort(year: number, month: number): string {
   return format(d, 'MMM yy', { locale: es })
 }
 
-export function getAge(birthDate: Timestamp | null | undefined): number {
-  const d = tsToDate(birthDate)
-  if (!d) return 0
-  return differenceInYears(new Date(), d)
+export function getAge(birthDate: unknown): number {
+  const d = tsToDate(birthDate as Timestamp | Date | null | undefined)
+  if (!d || d.getFullYear() < 1920) return 0
+  const age = differenceInYears(new Date(), d)
+  if (age < 0 || age > 120) return 0
+  return age
+}
+
+export function formatAge(birthDate: unknown): string {
+  const d = tsToDate(birthDate as Timestamp | Date | null | undefined)
+  if (!d || d.getFullYear() < 1920) return ''
+  const age = differenceInYears(new Date(), d)
+  if (age < 0 || age > 120) return ''
+  return `${age} año${age === 1 ? '' : 's'}`
 }
 
 export function currentYearMonth(): { year: number; month: number } {

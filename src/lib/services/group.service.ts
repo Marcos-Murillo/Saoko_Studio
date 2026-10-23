@@ -19,7 +19,7 @@ import { isDobleProcesoName } from '@/lib/utils/dancerCategories'
 
 const SECOND_GROUP_NOTE = 'Segundo grupo de Doble Proceso. No genera mensualidad.'
 
-async function syncDancerCurrentGroup(dancerId: string): Promise<void> {
+export async function syncDancerCurrentGroup(dancerId: string): Promise<void> {
   const current = await getDancerCurrentMemberships(dancerId)
   if (current.length === 0) {
     await updateDoc(doc(db, COLLECTIONS.DANCERS, dancerId), {
@@ -73,20 +73,45 @@ export async function createGroup(
 }
 
 export async function updateGroup(id: string, data: Partial<Group>): Promise<void> {
-  // IMPORTANT: Changing monthlyFee here NEVER affects existing monthlyFees documents.
-  // Historical fees have their own `amount` snapshot.
   await updateDoc(doc(db, COLLECTIONS.GROUPS, id), {
     ...data,
     updatedAt: serverTimestamp(),
   })
+  const live = await getGroupById(id)
+  if (live) await syncOpenRecordsForGroup(live)
 }
 
 export async function deleteGroup(id: string): Promise<void> {
   const members = await getGroupMembers(id)
+  const { removeUnpaidFeesForGroup } = await import('./fee.service')
   for (const m of members) {
     await unenrollDancer(m.id, m.dancerId, id)
+    await removeUnpaidFeesForGroup(m.dancerId, id)
   }
   await deleteDoc(doc(db, COLLECTIONS.GROUPS, id))
+}
+
+/** Aplica el nombre y tarifa actuales a matrículas vigentes y cuotas abiertas (sin abono). */
+export async function syncOpenRecordsForGroup(group: Group): Promise<void> {
+  const members = await getGroupMembers(group.id)
+  for (const m of members) {
+    const patch: Record<string, unknown> = { updatedAt: serverTimestamp() }
+    if (m.groupName !== group.name) patch.groupName = group.name
+    if (m.monthlyFeeSnapshot !== group.monthlyFee) patch.monthlyFeeSnapshot = group.monthlyFee
+    if (Object.keys(patch).length > 1) {
+      await updateDoc(doc(db, COLLECTIONS.GROUP_MEMBERSHIPS, m.id), patch)
+    }
+    await syncDancerCurrentGroup(m.dancerId)
+    if (m.chargesFee === false) {
+      await updateDoc(doc(db, COLLECTIONS.DANCERS, m.dancerId), {
+        secondGroupId: group.id,
+        secondGroupName: group.name,
+        updatedAt: serverTimestamp(),
+      })
+    }
+  }
+  const { syncOpenFeesForGroup } = await import('./fee.service')
+  await syncOpenFeesForGroup(group)
 }
 
 // ─── Group Memberships ────────────────────────────────────────────────────────
@@ -288,8 +313,12 @@ export async function unenrollDancer(
     updatedAt: serverTimestamp(),
   })
   await syncDancerCurrentGroup(dancerId)
-  await updateDoc(doc(db, COLLECTIONS.GROUPS, groupId), {
-    memberCount: increment(-1),
-    updatedAt: serverTimestamp(),
-  })
+  try {
+    await updateDoc(doc(db, COLLECTIONS.GROUPS, groupId), {
+      memberCount: increment(-1),
+      updatedAt: serverTimestamp(),
+    })
+  } catch {
+    // El grupo ya no existe (migración / borrado directo).
+  }
 }

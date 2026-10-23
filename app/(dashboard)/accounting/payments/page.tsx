@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Plus, RefreshCw, XCircle, TrendingUp, AlertTriangle, Download } from 'lucide-react'
+import { Plus, RefreshCw, TrendingUp, Download } from 'lucide-react'
 import { getAllPayments, voidPayment } from '@/lib/services/payment.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LinkButton } from '@/components/shared/LinkButton'
@@ -33,6 +33,7 @@ export default function PaymentsPage() {
   const [voidTarget, setVoidTarget] = useState<Payment | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding,    setVoiding]    = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'valid' | 'voided'>('valid')
 
   const load = async () => {
     setLoading(true)
@@ -68,6 +69,7 @@ export default function PaymentsPage() {
 
   const valid  = visible.filter(p => !p.isVoided)
   const voided = visible.filter(p => p.isVoided)
+  const listed = statusFilter === 'voided' ? voided : valid
   const total  = valid.reduce((s, p) => s + p.amount, 0)
 
   const selectStyle = {
@@ -99,13 +101,17 @@ export default function PaymentsPage() {
           <option value={0}>Todos los años</option>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
+        <select style={selectStyle} value={statusFilter} onChange={e => setStatusFilter(e.target.value as 'valid' | 'voided')}>
+          <option value="valid">Pagos vigentes</option>
+          <option value="voided">Pagos anulados{voided.length ? ` (${voided.length})` : ''}</option>
+        </select>
         <Button variant="outline" size="sm" onClick={load}
           style={{ background: 'transparent', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
           <RefreshCw size={13} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
           {loading ? 'Cargando...' : 'Actualizar'}
         </Button>
         <Button variant="outline" size="sm"
-          onClick={() => downloadXlsx(`pagos`, visible.map(p => ({
+          onClick={() => downloadXlsx(`pagos`, listed.map(p => ({
             Fecha: formatDate(p.paymentDate),
             Bailarin: p.dancerName ?? '',
             Concepto: p.concept,
@@ -119,9 +125,9 @@ export default function PaymentsPage() {
       </div>
 
       {/* KPIs — con skeleton si carga */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         {loading ? (
-          [...Array(3)].map((_, i) => (
+          [...Array(2)].map((_, i) => (
             <Card key={i} style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
               <CardContent className="p-5 flex flex-col gap-4">
                 <div className="flex items-start justify-between">
@@ -135,11 +141,9 @@ export default function PaymentsPage() {
         ) : (
           <>
             <KpiCard title="Total recaudado" value={formatCurrency(total)}
-              subtitle={`${valid.length} pago(s) válidos`} icon={TrendingUp} color="#4caf7d" />
-            <KpiCard title="Pagos válidos" value={String(valid.length)}
+              subtitle={`${valid.length} pago(s) vigentes`} icon={TrendingUp} color="#4caf7d" />
+            <KpiCard title="Pagos vigentes" value={String(valid.length)}
               subtitle="en el período" icon={TrendingUp} color="var(--gold)" />
-            <KpiCard title="Anulados" value={String(voided.length)}
-              subtitle="requieren revisión" icon={AlertTriangle} color="#e05252" />
           </>
         )}
       </div>
@@ -173,7 +177,7 @@ export default function PaymentsPage() {
               ))}
 
               {/* Datos reales */}
-              {!loading && visible.map(p => (
+              {!loading && listed.map(p => (
                 <TableRow key={p.id} style={{ borderColor: 'var(--border)', opacity: p.isVoided ? 0.5 : 1 }}>
                   <TableCell className="max-md:hidden text-sm" style={{ color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
                     {formatDate(p.paymentDate)}
@@ -214,7 +218,7 @@ export default function PaymentsPage() {
               ))}
 
               {/* Estado vacío */}
-              {!loading && visible.length === 0 && (
+              {!loading && listed.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-14"
                     style={{ color: 'var(--muted-foreground)' }}>
@@ -224,9 +228,13 @@ export default function PaymentsPage() {
                         <TrendingUp size={20} style={{ color: 'var(--muted-foreground)' }} />
                       </div>
                       <div>
-                        <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>Sin pagos en este período</p>
+                        <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                          {statusFilter === 'voided' ? 'Sin pagos anulados en este período' : 'Sin pagos en este período'}
+                        </p>
                         <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                          Registra el primer pago con el botón de arriba
+                          {statusFilter === 'voided'
+                            ? 'Los pagos anulados aparecen aquí cuando los necesites revisar'
+                            : 'Registra el primer pago con el botón de arriba'}
                         </p>
                       </div>
                     </div>

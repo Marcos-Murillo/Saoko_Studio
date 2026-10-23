@@ -6,7 +6,7 @@ import { getDancerCurrentMemberships } from '@/lib/services/group.service'
 import { getDancerCredit } from '@/lib/services/credit.service'
 import { ActiveBadge } from '@/components/shared/StatusBadge'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
-import { formatDate, getAge } from '@/lib/utils/dates'
+import { formatDate, formatAge } from '@/lib/utils/dates'
 import { readCategoryNames } from '@/lib/utils/dancerCategories'
 import { formatCurrency } from '@/lib/utils/currency'
 import { Button } from '@/components/ui/button'
@@ -69,9 +69,10 @@ export function DancerProfilePanel({
           <h3 className="text-lg font-semibold" style={{ color: 'var(--foreground)' }}>{dancer.fullName}</h3>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <ActiveBadge isActive={dancer.isActive} />
-            {dancer.birthDate && (
-              <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{getAge(dancer.birthDate)} años</span>
-            )}
+            {(() => {
+              const age = formatAge(dancer.birthDate)
+              return age ? <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{age}</span> : null
+            })()}
           </div>
         </div>
       </div>
@@ -97,6 +98,7 @@ export function DancerProfilePanel({
       <div>
         <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--gold)' }}>Datos</p>
         <InfoRow icon={Calendar} label="Nacimiento" value={formatDate(dancer.birthDate)} />
+        <InfoRow icon={Calendar} label="Edad" value={formatAge(dancer.birthDate)} />
         <InfoRow icon={User} label="Género" value={dancer.gender} />
         <InfoRow icon={MapPin} label="Ciudad" value={dancer.city} />
         <InfoRow icon={Calendar} label="Categorías" value={readCategoryNames(dancer).join(', ')} />

@@ -8,9 +8,9 @@ import { DancerForm, type DancerFormData } from '@/components/dancers/DancerForm
 import { useToast } from '@/components/shared/Toast'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { isoToTs } from '@/lib/utils/dates'
+import { toDateInputValue } from '@/lib/utils/localDate'
 import { packDancerCategories, readCategoryIds } from '@/lib/utils/dancerCategories'
 import { persistSecondGroupChoice } from '@/lib/services/group.service'
-import { format } from 'date-fns'
 import type { Dancer, BloodType, Gender } from '@/types'
 
 export default function EditDancerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -57,9 +57,7 @@ export default function EditDancerPage({ params }: { params: Promise<{ id: strin
   if (loading) return <PageLoader />
   if (!dancer) return <p style={{ color: 'var(--text-muted)' }}>No encontrado.</p>
 
-  const birthDateStr = dancer.birthDate
-    ? format(dancer.birthDate.toDate(), 'yyyy-MM-dd')
-    : ''
+  const birthDateStr = toDateInputValue(dancer.birthDate)
 
   return (
     <div className="flex flex-col gap-4">
