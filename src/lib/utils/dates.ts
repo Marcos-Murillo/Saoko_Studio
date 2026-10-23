@@ -55,7 +55,7 @@ function parseBirthString(raw: string): Date | null {
   return isValid(parsed) ? parsed : null
 }
 
-export function tsToDate(ts: Timestamp | Date | null | undefined): Date | null {
+export function tsToDate(ts: unknown): Date | null {
   if (ts == null || ts === '') return null
   if (typeof ts === 'number') {
     const fromExcel = excelSerialToDate(ts)
@@ -76,7 +76,7 @@ export function dateToTs(date: Date): Timestamp {
 }
 
 export function formatDate(ts: unknown): string {
-  const d = tsToDate(ts as Timestamp | Date | null | undefined)
+  const d = tsToDate(ts)
   if (!d || !isValid(d)) return '—'
   return format(d, 'dd/MM/yyyy', { locale: es })
 }
@@ -98,7 +98,7 @@ export function formatMonthShort(year: number, month: number): string {
 }
 
 export function getAge(birthDate: unknown): number {
-  const d = tsToDate(birthDate as Timestamp | Date | null | undefined)
+  const d = tsToDate(birthDate)
   if (!d || d.getFullYear() < 1920) return 0
   const age = differenceInYears(new Date(), d)
   if (age < 0 || age > 120) return 0
@@ -106,7 +106,7 @@ export function getAge(birthDate: unknown): number {
 }
 
 export function formatAge(birthDate: unknown): string {
-  const d = tsToDate(birthDate as Timestamp | Date | null | undefined)
+  const d = tsToDate(birthDate)
   if (!d || d.getFullYear() < 1920) return ''
   const age = differenceInYears(new Date(), d)
   if (age < 0 || age > 120) return ''
