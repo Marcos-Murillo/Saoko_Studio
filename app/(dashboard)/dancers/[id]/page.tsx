@@ -79,7 +79,7 @@ export default function DancerDetailPage({ params }: { params: Promise<{ id: str
   if (!dancer)  return <p style={{ color: 'var(--muted-foreground)' }}>No encontrado.</p>
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1100px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1100px]">
       {/* Back */}
       <button onClick={() => router.back()}
         className="flex items-center gap-2 text-sm w-fit"

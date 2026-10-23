@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MoreHorizontal, LogOut, X } from 'lucide-react'
+import { MoreHorizontal, LogOut, UserRound, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { NAV_ITEMS, MOBILE_TAB_HREFS } from '@/components/layout/navItems'
 import { cn } from 'cn'
@@ -13,6 +13,9 @@ export function MobileTabBar() {
   const [more, setMore] = useState(false)
   const role = adminUser?.role
   const visible = role ? NAV_ITEMS.filter(n => !n.check || n.check(role)) : []
+  if (adminUser?.role === 'teacher' && adminUser.dancerId) {
+    visible.push({ href: '/mi-espacio', label: 'Mi espacio', icon: UserRound })
+  }
   const tabs = visible.filter(n => (MOBILE_TAB_HREFS as readonly string[]).includes(n.href))
   const extra = visible.filter(n => !(MOBILE_TAB_HREFS as readonly string[]).includes(n.href))
   const extraActive = extra.some(n => pathname === n.href || pathname.startsWith(n.href + '/'))

@@ -2,7 +2,7 @@
 
 import { useLayoutEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { LogOut } from 'lucide-react'
+import { LogOut, UserRound } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { ROLE_LABELS } from '@/lib/auth/roles'
@@ -70,6 +70,9 @@ export function AppSidebar() {
   const { adminUser } = useAuth()
   const role = adminUser?.role
   const visible = role ? NAV_ITEMS.filter((item) => !item.check || item.check(role)) : []
+  if (adminUser?.role === 'teacher' && adminUser.dancerId) {
+    visible.push({ href: '/mi-espacio', label: 'Mi espacio', icon: UserRound })
+  }
 
   return (
     <Sidebar>

@@ -99,7 +99,7 @@ export default function DancerGuardiansPage({ params }: { params: Promise<{ id: 
   )
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="saoko-limit flex flex-col gap-6 max-w-3xl">
       <Link href={`/dancers/${id}`} style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
         <ArrowLeft size={14} /> Volver a {dancer?.fullName}
       </Link>

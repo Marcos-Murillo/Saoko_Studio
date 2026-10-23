@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { Expense } from '@/types'
 
 import { LinkButton } from '@/components/shared/LinkButton'
@@ -40,7 +41,7 @@ export default function ExpensesPage() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1200px]">
       <PageHeader
         title="Gastos"
         description="Registro de gastos de la academia. Mantén actualizado para calcular el balance real."
@@ -84,6 +85,8 @@ export default function ExpensesPage() {
 
       <Card style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
         <CardContent className="p-0">
+          <PagedTable items={expenses} resetKey={`${expenses[0]?.id ?? ''}-${expenses.length}`}>
+          {rows => (
           <Table>
             <TableHeader>
               <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -98,7 +101,7 @@ export default function ExpensesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map(e => (
+              {rows.map(e => (
                 <TableRow key={e.id} style={{ borderColor: 'var(--border)' }}>
                   <TableCell className="max-md:hidden text-sm" style={{ color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>{formatDate(e.expenseDate)}</TableCell>
                   <TableCell className="font-medium text-sm min-w-0"><span className="truncate block">{e.concept}</span></TableCell>
@@ -136,6 +139,8 @@ export default function ExpensesPage() {
               )}
             </TableBody>
           </Table>
+          )}
+          </PagedTable>
         </CardContent>
       </Card>
     </div>

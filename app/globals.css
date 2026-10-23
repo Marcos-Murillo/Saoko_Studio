@@ -143,6 +143,11 @@
   will-change: transform;
 }
 
+.saoko-wide .saoko-limit {
+  max-width: none !important;
+  width: 100%;
+}
+
 @media (min-width: 768px) {
   :root { --sidebar-width: 60px; }
   html[data-sidebar-open] { --sidebar-width: 300px; }

@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/dates'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { DancerCredit } from '@/types'
 
 export default function CreditsPage() {
@@ -45,6 +46,8 @@ export default function CreditsPage() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No hay saldos a favor registrados</p>
           </div>
         ) : (
+          <PagedTable items={credits}>
+          {rows => (
           <table className="data-table">
             <thead><tr>
               <th className="saoko-col-main">Bailarín</th>
@@ -53,7 +56,7 @@ export default function CreditsPage() {
               <th className="saoko-col-action"></th>
             </tr></thead>
             <tbody>
-              {credits.map(c => (
+              {rows.map(c => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 500 }} className="min-w-0"><span className="truncate block">{c.dancerName}</span></td>
                   <td>
@@ -78,6 +81,8 @@ export default function CreditsPage() {
               ))}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         )}
       </div>
     </div>

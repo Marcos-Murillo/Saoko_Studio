@@ -28,6 +28,7 @@ import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate, toMillis } from '@/lib/utils/dates'
 import { parseLocalDateInput } from '@/lib/utils/localDate'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { EventPayment, EventRegistration, PaymentMethod, StudioEvent } from '@/types'
 
 const inputStyle = { background: 'var(--accent)', borderColor: 'var(--border)', color: 'var(--foreground)' }
@@ -144,6 +145,8 @@ export default function EventPaymentsPage() {
               No hay pagos con esos filtros.
             </p>
           ) : (
+            <PagedTable items={filtered}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -159,7 +162,7 @@ export default function EventPaymentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(p => {
+                {rows.map(p => {
                   const reg = registrations.find(r => r.id === p.registrationId)
                   return (
                     <TableRow key={p.id}>
@@ -184,6 +187,8 @@ export default function EventPaymentsPage() {
                 })}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

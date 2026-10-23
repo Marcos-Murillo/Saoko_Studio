@@ -49,7 +49,7 @@ export default function EventsPage() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1400px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1400px]">
       <PageHeader
         title="Eventos"
         description="Festivales y competencias. Los pagos de eventos no entran a la caja de Saoko."

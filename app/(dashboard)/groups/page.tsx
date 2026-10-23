@@ -44,10 +44,11 @@ export default function GroupsPage() {
   useEffect(() => { load() }, [])
 
   const filtered = useMemo(() => groups.filter(g => {
+    if (adminUser?.role === 'teacher' && g.instructorId !== adminUser.id) return false
     const ok = filter === 'all' || (filter === 'active' ? g.isActive : !g.isActive)
     const q  = search.toLowerCase()
     return ok && (!q || g.name.toLowerCase().includes(q) || (g.modalityName ?? '').toLowerCase().includes(q))
-  }), [groups, search, filter])
+  }), [groups, search, filter, adminUser])
 
   const handleEditSubmit = async (data: GroupFormData) => {
     if (!editing) return
@@ -74,7 +75,7 @@ export default function GroupsPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1200px]">
       <PageHeader
         title="Grupos"
         description="Administra los grupos de baile, sus categorías y tarifas."
@@ -170,14 +171,19 @@ export default function GroupsPage() {
                 <Separator style={{ background: 'var(--border)' }} />
 
                 {/* Footer */}
-                <div className="flex items-center justify-between mt-auto">
+                <div className="flex items-center justify-between mt-auto gap-3">
                   <div>
                     <p className="text-[0.65rem] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Mensualidad</p>
                     <p className="text-lg font-bold" style={{ color: 'var(--gold)' }}>{formatCurrency(g.monthlyFee)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[0.65rem] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Integrantes</p>
-                    <p className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{g.memberCount ?? 0}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-[0.65rem] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Integrantes</p>
+                      <p className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{g.memberCount ?? 0}</p>
+                    </div>
+                    {adminUser?.role === 'super_admin' && (
+                      <LinkButton href={`/groups/${g.id}`} variant="primary" size="sm">Ver</LinkButton>
+                    )}
                   </div>
                 </div>
               </CardContent>

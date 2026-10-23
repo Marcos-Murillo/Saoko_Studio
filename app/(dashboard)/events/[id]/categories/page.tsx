@@ -22,6 +22,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatCurrency } from '@/lib/utils/currency'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import type { EventCategory, StudioEvent } from '@/types'
 
@@ -93,6 +94,8 @@ export default function EventCategoriesPage() {
               Aún no hay categorías. El Full Pass es independiente del precio de cada categoría.
             </p>
           ) : (
+            <PagedTable items={categories}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -103,7 +106,7 @@ export default function EventCategoriesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map(cat => (
+                {rows.map(cat => (
                   <TableRow key={cat.id}>
                     <TableCell className="font-medium min-w-0"><span className="truncate block">{cat.name}</span></TableCell>
                     <TableCell>{formatCurrency(cat.price)}</TableCell>
@@ -127,6 +130,8 @@ export default function EventCategoriesPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatDate } from '@/lib/utils/dates'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import type { Costume, CostumeLoan, Dancer } from '@/types'
 
@@ -85,7 +86,7 @@ export default function CostumesPage() {
   if (loading) return <PageLoader />
 
   return (
-    <div className="flex flex-col gap-8 max-w-[1100px]">
+    <div className="saoko-limit flex flex-col gap-8 max-w-[1100px]">
       <PageHeader
         title="Vestuario"
         description="Inventario y préstamos. Aquí ves quién tiene una prenda y quién no la ha devuelto."
@@ -135,6 +136,8 @@ export default function CostumesPage() {
           <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
             <p className="font-semibold">No devueltos</p>
           </div>
+          <PagedTable items={open}>
+          {rows => (
           <Table>
             <TableHeader>
               <TableRow>
@@ -147,7 +150,7 @@ export default function CostumesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {open.map(l => (
+              {rows.map(l => (
                 <TableRow key={l.id}>
                   <TableCell className="font-medium min-w-0"><span className="truncate block">{l.costumeName}</span></TableCell>
                   <TableCell className="max-md:hidden">{l.dancerName}</TableCell>
@@ -188,6 +191,8 @@ export default function CostumesPage() {
               )}
             </TableBody>
           </Table>
+          )}
+          </PagedTable>
         </CardContent>
       </Card>
     </div>

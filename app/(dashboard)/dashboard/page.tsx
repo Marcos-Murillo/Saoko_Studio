@@ -202,7 +202,7 @@ export default function DashboardPage() {
   ].filter(d => d.value > 0)
 
   return (
-    <div className="flex flex-col gap-8 max-w-[1400px]">
+    <div className="saoko-limit flex flex-col gap-8 max-w-[1400px]">
       <PageHeader
         title="Dashboard"
         description={`Resumen de ${label}`}

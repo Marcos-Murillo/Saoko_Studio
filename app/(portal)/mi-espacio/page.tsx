@@ -59,6 +59,7 @@ export default function StudentSpacePage() {
       onSignOut={() => signOut()}
       onSaveProfile={saveProfile}
       onEnrollGroups={enrollGroups}
+      studioHref={adminUser.role === 'teacher' ? '/dashboard' : undefined}
     />
   )
 }

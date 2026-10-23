@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { BTN } from '@/components/shared/buttonStyles'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { LinkButton } from '@/components/shared/LinkButton'
 import { useToast } from '@/components/shared/Toast'
@@ -427,7 +428,7 @@ export default function DancersPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
+    <div className="flex w-full flex-col gap-6">
       <PageHeader
         title="Bailarines"
         description="Administra la información de todos los bailarines de Saoko."
@@ -509,6 +510,8 @@ export default function DancersPage() {
               <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No se encontraron bailarines</p>
             </div>
           ) : (
+            <PagedTable items={filtered} resetKey={`${search}|${filter}`}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -534,7 +537,7 @@ export default function DancersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(d => (
+                {rows.map(d => (
                   <TableRow key={d.id} style={{ borderColor: 'var(--border)' }}>
                     <TableCell className={selectMode ? '' : 'max-md:hidden'}>
                       {selectMode && (
@@ -646,6 +649,8 @@ export default function DancersPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

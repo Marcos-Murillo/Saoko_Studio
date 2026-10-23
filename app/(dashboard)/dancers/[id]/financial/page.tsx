@@ -13,6 +13,7 @@ import { formatDate, formatMonth } from '@/lib/utils/dates'
 import { formatCurrency } from '@/lib/utils/currency'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { Dancer, MonthlyFee, Payment, DancerCredit } from '@/types'
 
 export default function DancerFinancialPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,7 +43,7 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
     .reduce((s, f) => s + (f.amount - f.amountPaid), 0)
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl">
+    <div className="saoko-limit flex flex-col gap-6 max-w-5xl">
       <Link href={`/dancers/${id}`} style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
         <ArrowLeft size={14} /> Volver a {dancer?.fullName}
       </Link>
@@ -69,6 +70,8 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
 
       {tab === 'fees' && (
         <div className="card overflow-hidden">
+          <PagedTable items={fees}>
+          {rows => (
           <table className="data-table">
             <thead><tr>
               <th>Período</th>
@@ -80,7 +83,7 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
               <th className="saoko-col-action"></th>
             </tr></thead>
             <tbody>
-              {fees.map(f => (
+              {rows.map(f => (
                 <tr key={f.id}>
                   <td style={{ fontWeight: 500 }}>{formatMonth(f.periodYear, f.periodMonth)}</td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{f.groupName}</td>
@@ -103,11 +106,15 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
               {fees.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>Sin mensualidades</td></tr>}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         </div>
       )}
 
       {tab === 'payments' && (
         <div className="card overflow-hidden">
+          <PagedTable items={payments}>
+          {rows => (
           <table className="data-table">
             <thead><tr>
               <th>Fecha</th>
@@ -118,7 +125,7 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
               <th className="saoko-col-action"></th>
             </tr></thead>
             <tbody>
-              {payments.map(p => (
+              {rows.map(p => (
                 <tr key={p.id} style={{ opacity: p.isVoided ? 0.5 : 1 }}>
                   <td style={{ color: 'var(--text-secondary)' }}>{formatDate(p.paymentDate)}</td>
                   <td className="max-md:hidden" style={{ fontWeight: 500 }}>{p.concept}</td>
@@ -137,6 +144,8 @@ export default function DancerFinancialPage({ params }: { params: Promise<{ id: 
               {payments.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>Sin pagos registrados</td></tr>}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         </div>
       )}
     </div>

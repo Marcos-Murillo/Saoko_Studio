@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Skeleton } from '@/components/ui/skeleton'
 import { BTN } from '@/components/shared/buttonStyles'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { PERMISSIONS } from '@/lib/auth/roles'
@@ -40,8 +41,31 @@ function newSlot(): TimeSlot {
 }
 
 /* ─── Calendario semanal ─────────────────────────────────────────────────── */
+function clockParts(value: string) {
+  const [hour, minute] = value.split(':').map(Number)
+  return {
+    hour: Number.isFinite(hour) ? hour : 6,
+    minute: Number.isFinite(minute) ? minute : 0,
+  }
+}
+
+function calendarHours(schedules: Schedule[]) {
+  const active = schedules.filter(item => item.isActive !== false && item.startTime)
+  if (active.length === 0) return []
+  let first = 23
+  let last = 0
+  active.forEach(item => {
+    const start = clockParts(item.startTime).hour
+    const end = clockParts(item.endTime || item.startTime)
+    const endHour = end.minute > 0 ? end.hour : Math.max(start, end.hour - 1)
+    first = Math.min(first, start)
+    last = Math.max(last, endHour)
+  })
+  return Array.from({ length: last - first + 1 }, (_, index) => first + index)
+}
+
 function WeekCalendar({ schedules, groups }: { schedules: Schedule[]; groups: Group[] }) {
-  const HOURS = Array.from({ length: 16 }, (_, i) => i + 6) // 06:00 – 21:00
+  const HOURS = calendarHours(schedules)
 
   const byDay = useMemo(() => {
     const map: Record<string, Schedule[]> = {}
@@ -55,10 +79,7 @@ function WeekCalendar({ schedules, groups }: { schedules: Schedule[]; groups: Gr
     return i >= 0 ? i : 0
   }
 
-  const hourOf = (t: string) => {
-    const n = Number(t.slice(0, 2))
-    return Number.isFinite(n) ? n : 6
-  }
+  const hourOf = (t: string) => clockParts(t).hour
 
   const inHour = (s: Schedule, hour: number) => {
     const start = hourOf(s.startTime)
@@ -66,10 +87,20 @@ function WeekCalendar({ schedules, groups }: { schedules: Schedule[]; groups: Gr
     return hour >= start && hour < Math.max(end, start + 1)
   }
 
+  if (HOURS.length === 0) {
+    return (
+      <Card style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <CardContent className="py-16 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>
+          No hay clases en el calendario.
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card style={{ background: 'var(--card)', border: '1px solid var(--border)', overflow: 'hidden' }}>
       <div className="overflow-x-auto">
-        <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(7, minmax(120px, 1fr))', minWidth: 920 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '72px repeat(7, minmax(120px, 1fr))', width: '100%' }}>
           <div className="px-2 py-3 text-center text-[0.65rem] uppercase tracking-widest"
             style={{ borderBottom: '1px solid var(--border)', background: 'var(--accent)', color: 'var(--muted-foreground)' }}>
             Hora
@@ -366,10 +397,15 @@ export default function SchedulesPage() {
     setToggleTarget(null); load()
   }
 
-  const active = schedules.filter(s => s.isActive !== false)
+  const taughtIds = adminUser?.role === 'teacher'
+    ? new Set(groups.filter(group => group.instructorId === adminUser.id).map(group => group.id))
+    : null
+  const visibleSchedules = taughtIds ? schedules.filter(item => taughtIds.has(item.groupId)) : schedules
+  const visibleGroups = taughtIds ? groups.filter(group => taughtIds.has(group.id)) : groups
+  const active = visibleSchedules.filter(s => s.isActive !== false)
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1200px]">
       <PageHeader
         title="Horarios"
         description="Visualiza y administra los horarios semanales. Puedes crear varios días para el mismo grupo a la vez."
@@ -401,7 +437,7 @@ export default function SchedulesPage() {
         ) : [
           { label: 'Horarios activos',   n: active.length,                            c: '#4caf7d' },
           { label: 'Grupos con horario', n: new Set(active.map(s => s.groupId)).size, c: 'var(--gold)' },
-          { label: 'Total registros',    n: schedules.length,                         c: 'var(--muted-foreground)' },
+          { label: 'Total registros',    n: visibleSchedules.length,                  c: 'var(--muted-foreground)' },
         ].map(s => (
           <div key={s.label} className="flex items-baseline gap-1.5">
             <span className="text-xl font-bold" style={{ color: s.c }}>{s.n}</span>
@@ -425,13 +461,15 @@ export default function SchedulesPage() {
         loading ? (
           <Skeleton className="h-64 w-full rounded-xl" style={{ background: 'var(--accent)' }} />
         ) : (
-          <WeekCalendar schedules={schedules} groups={groups} />
+          <WeekCalendar schedules={visibleSchedules} groups={visibleGroups} />
         )
       )}
 
       {view === 'list' && (
           <Card style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
             <CardContent className="p-0">
+              <PagedTable items={DAYS.flatMap(day => visibleSchedules.filter(s => s.dayOfWeek === day))}>
+              {rows => (
               <Table>
                 <TableHeader>
                   <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -451,7 +489,7 @@ export default function SchedulesPage() {
                       ))}
                     </TableRow>
                   ))}
-                  {!loading && schedules.length === 0 && (
+                  {!loading && visibleSchedules.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5}>
                         <div className="flex flex-col items-center py-14 gap-3">
@@ -469,15 +507,14 @@ export default function SchedulesPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {!loading && DAYS.flatMap(day =>
-                    schedules.filter(s => s.dayOfWeek === day).map(s => (
+                  {!loading && rows.map(s => (
                       <TableRow key={s.id} style={{ borderColor: 'var(--border)', opacity: s.isActive !== false ? 1 : 0.5 }}>
                         <TableCell className="max-md:hidden">
                           <Badge variant="outline"
                             style={{
-                              color:      DAY_COLORS[DAYS.indexOf(day) % 7],
-                              borderColor:`${DAY_COLORS[DAYS.indexOf(day) % 7]}40`,
-                              background: `${DAY_COLORS[DAYS.indexOf(day) % 7]}10`,
+                              color:      DAY_COLORS[DAYS.indexOf(s.dayOfWeek) % 7],
+                              borderColor:`${DAY_COLORS[DAYS.indexOf(s.dayOfWeek) % 7]}40`,
+                              background: `${DAY_COLORS[DAYS.indexOf(s.dayOfWeek) % 7]}10`,
                               fontSize:   '0.72rem',
                             }}>
                             {s.dayOfWeek}
@@ -530,10 +567,11 @@ export default function SchedulesPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
+                  ))}
                 </TableBody>
               </Table>
+              )}
+              </PagedTable>
             </CardContent>
           </Card>
       )}

@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import type { Payment } from '@/types'
 
@@ -80,7 +81,7 @@ export default function PaymentsPage() {
   const years = Array.from({ length: 4 }, (_, i) => cy - 1 + i)
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1200px]">
+    <div className="saoko-limit flex flex-col gap-6 max-w-[1200px]">
       <PageHeader
         title="Pagos"
         description="Todos los pagos registrados. Filtra por mes o año si lo necesitas."
@@ -151,6 +152,8 @@ export default function PaymentsPage() {
       {/* Tabla */}
       <Card style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
         <CardContent className="p-0">
+          <PagedTable items={listed} resetKey={`${year}-${month}-${statusFilter}`}>
+          {rows => (
           <Table>
             <TableHeader>
               <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -177,7 +180,7 @@ export default function PaymentsPage() {
               ))}
 
               {/* Datos reales */}
-              {!loading && listed.map(p => (
+              {!loading && rows.map(p => (
                 <TableRow key={p.id} style={{ borderColor: 'var(--border)', opacity: p.isVoided ? 0.5 : 1 }}>
                   <TableCell className="max-md:hidden text-sm" style={{ color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
                     {formatDate(p.paymentDate)}
@@ -243,6 +246,8 @@ export default function PaymentsPage() {
               )}
             </TableBody>
           </Table>
+          )}
+          </PagedTable>
         </CardContent>
       </Card>
 

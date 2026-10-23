@@ -15,6 +15,7 @@ import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { formatCurrency } from '@/lib/utils/currency'
 import { formatDate } from '@/lib/utils/dates'
 import { StatMini } from '@/components/shared/KpiCard'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { BTN } from '@/components/shared/buttonStyles'
@@ -71,6 +72,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
   if (loading) return <PageLoader />
   if (!group) return <p style={{ color: 'var(--text-muted)' }}>Grupo no encontrado.</p>
+  if (adminUser?.role === 'teacher' && group.instructorId !== adminUser.id) {
+    return <p style={{ color: 'var(--text-muted)' }}>Este grupo no está a tu cargo.</p>
+  }
 
   const enrolledIds = new Set(members.map(m => m.dancerId))
   const available = allDancers.filter(d =>
@@ -78,7 +82,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   )
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl">
+    <div className="saoko-limit flex flex-col gap-6 max-w-5xl">
       {/* Header */}
       <div className="card p-6">
         <div className="flex items-start justify-between gap-4">
@@ -157,7 +161,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
           {members.length === 0
             ? <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin integrantes</p>
-            : members.map(m => (
+            : (
+            <PagedTable items={members}>
+            {rows => rows.map(m => (
               <div key={m.id} className="flex items-center justify-between py-2.5"
                 style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <div>
@@ -180,7 +186,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                   )}
                 </div>
               </div>
-            ))
+            ))}
+            </PagedTable>
+            )
           }
         </div>
 

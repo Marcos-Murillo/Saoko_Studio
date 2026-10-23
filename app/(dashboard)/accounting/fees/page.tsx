@@ -13,6 +13,7 @@ import { downloadXlsx } from '@/lib/utils/exportExcel'
 import { BTN } from '@/components/shared/buttonStyles'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { MonthlyFee } from '@/types'
 import { useAuth } from '@/lib/auth/AuthContext'
 
@@ -84,6 +85,8 @@ export default function FeesPage() {
       <Card style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}>
         <CardContent className="p-0">
           {loading ? <PageLoader /> : (
+            <PagedTable items={fees} resetKey={`${year}-${month}`}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -97,7 +100,7 @@ export default function FeesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {fees.map(f => (
+                {rows.map(f => (
                   <TableRow key={f.id} style={{ borderColor: 'var(--border-subtle)' }}>
                     <TableCell className="font-medium min-w-0"><span className="truncate block">{f.dancerName}</span></TableCell>
                     <TableCell className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{f.groupName}</TableCell>
@@ -126,6 +129,8 @@ export default function FeesPage() {
                 )}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

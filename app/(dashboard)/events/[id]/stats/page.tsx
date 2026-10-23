@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/utils/currency'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { EventRegistration, EventStats, StudioEvent } from '@/types'
 
 export default function EventStatsPage() {
@@ -65,6 +66,8 @@ export default function EventStatsPage() {
           {byCategory.length === 0 ? (
             <p className="text-sm py-6 text-center" style={{ color: 'var(--muted-foreground)' }}>Sin datos aún</p>
           ) : (
+            <PagedTable items={byCategory}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -76,7 +79,7 @@ export default function EventStatsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {byCategory.map(row => (
+                {rows.map(row => (
                   <TableRow key={row.name}>
                     <TableCell className="font-medium min-w-0"><span className="truncate block">{row.name}</span></TableCell>
                     <TableCell className="max-md:hidden">{row.count}</TableCell>
@@ -92,6 +95,8 @@ export default function EventStatsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>
@@ -99,6 +104,8 @@ export default function EventStatsPage() {
       <Card>
         <CardContent className="pt-4">
           <p className="text-sm font-semibold mb-3" style={{ color: 'var(--foreground)' }}>Inscripciones</p>
+          <PagedTable items={regs}>
+          {rows => (
           <Table>
             <TableHeader>
               <TableRow>
@@ -112,7 +119,7 @@ export default function EventStatsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {regs.map(r => (
+              {rows.map(r => (
                 <TableRow key={r.id}>
                   <TableCell className="min-w-0"><span className="truncate block">{r.dancerName}</span></TableCell>
                   <TableCell className="max-md:hidden">{r.categoryName}</TableCell>
@@ -129,8 +136,10 @@ export default function EventStatsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          )}
+          </PagedTable>
         </CardContent>
       </Card>
     </div>

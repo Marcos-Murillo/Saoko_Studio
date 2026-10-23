@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { BTN } from '@/components/shared/buttonStyles'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 import type { MonthlyFee, Expense, Payment } from '@/types'
@@ -208,6 +209,8 @@ export default function ReportsPage() {
           {movements.length === 0 ? (
             <p className="text-sm py-6 text-center" style={{ color: 'var(--muted-foreground)' }}>Sin movimientos en el rango</p>
           ) : (
+            <PagedTable items={movements}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -221,7 +224,7 @@ export default function ReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.map((m, i) => (
+                {rows.map((m, i) => (
                   <TableRow key={i}>
                     <TableCell>{formatDate(m.date)}</TableCell>
                     <TableCell className="max-md:hidden" style={{ color: m.tipo === 'Ingreso' ? '#4caf7d' : '#e05252' }}>{m.tipo}</TableCell>
@@ -241,6 +244,8 @@ export default function ReportsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

@@ -120,7 +120,12 @@ service cloud.firestore {
           .hasOnly(['mustSetPassword', 'updatedAt'])
         && request.resource.data.mustSetPassword == false
       );
-      allow delete: if false;
+      allow delete: if isAdmin()
+        && userId != request.auth.uid
+        && (
+          isSuper()
+          || resource.data.role in ['staff', 'teacher', 'student']
+        );
     }
 
     // Cédula → email for login. Get is public so users can sign in with document
@@ -189,7 +194,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['authUid', 'missing', 'fullName', 'isActive', 'documentKey'])
       );
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /dancers/{id} {

@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase/config'
 import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { Group, GroupMembership } from '@/types'
 import { isDobleProcesoName } from '@/lib/utils/dancerCategories'
+import { getSchedulesByGroup, updateSchedule } from '@/lib/services/schedule.service'
 
 const SECOND_GROUP_NOTE = 'Segundo grupo de Doble Proceso. No genera mensualidad.'
 
@@ -70,6 +71,26 @@ export async function createGroup(
     updatedAt: serverTimestamp(),
   })
   return ref.id
+}
+
+/** Vincula o retira al profesor del grupo. No toca la matrícula de bailarín. */
+export async function assignTeacherGroups(userId: string, userName: string, groupIds: string[]): Promise<void> {
+  const groups = await getGroups(false)
+  const chosen = new Set(groupIds)
+  await Promise.all(groups.map(async group => {
+    const teaches = group.instructorId === userId
+    const selected = chosen.has(group.id)
+    if (!selected && !teaches) return
+    const instructorId = selected ? userId : null
+    const instructorName = selected ? userName : null
+    await updateDoc(doc(db, COLLECTIONS.GROUPS, group.id), {
+      instructorId,
+      instructorName,
+      updatedAt: serverTimestamp(),
+    })
+    const classes = await getSchedulesByGroup(group.id)
+    await Promise.all(classes.map(item => updateSchedule(item.id, { instructorId, instructorName })))
+  }))
 }
 
 export async function updateGroup(id: string, data: Partial<Group>): Promise<void> {

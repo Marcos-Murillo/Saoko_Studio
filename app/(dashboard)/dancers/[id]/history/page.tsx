@@ -9,6 +9,7 @@ import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { formatDate } from '@/lib/utils/dates'
 import { formatCurrency } from '@/lib/utils/currency'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { GroupMembership, Dancer } from '@/types'
 
 export default function DancerHistoryPage({ params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,7 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
   if (loading) return <PageLoader />
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="saoko-limit flex flex-col gap-6 max-w-3xl">
       <Link href={`/dancers/${id}`} style={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
         <ArrowLeft size={14} /> Volver a {dancer?.fullName}
       </Link>
@@ -42,6 +43,8 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Sin historial de grupos</p>
           </div>
         ) : (
+          <PagedTable items={memberships}>
+          {rows => (
           <table className="data-table">
             <thead>
               <tr>
@@ -54,7 +57,7 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
               </tr>
             </thead>
             <tbody>
-              {memberships.map(m => (
+              {rows.map(m => (
                 <tr key={m.id}>
                   <td style={{ fontWeight: 500 }} className="min-w-0"><span className="truncate block">{m.groupName}</span></td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{formatDate(m.startDate)}</td>
@@ -72,6 +75,8 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
               ))}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         )}
       </div>
     </div>

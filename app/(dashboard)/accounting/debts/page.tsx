@@ -17,6 +17,7 @@ import { downloadXlsx } from '@/lib/utils/exportExcel'
 import { BTN } from '@/components/shared/buttonStyles'
 import { StatMini } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import type { MonthlyFee } from '@/types'
 
@@ -90,6 +91,8 @@ export default function DebtsPage() {
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Todos los bailarines están al día</p>
             </div>
           ) : (
+            <PagedTable items={rows} resetKey={search}>
+            {pageRows => (
             <Table>
               <TableHeader>
                 <TableRow style={{ borderColor: 'var(--border)' }}>
@@ -102,7 +105,7 @@ export default function DebtsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map(r => (
+                {pageRows.map(r => (
                   <>
                     <TableRow key={r.dancerId} style={{ borderColor: 'var(--border-subtle)', cursor: 'pointer' }}
                       onClick={() => setExpanded(expanded === r.dancerId ? null : r.dancerId)}>
@@ -165,6 +168,8 @@ export default function DebtsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

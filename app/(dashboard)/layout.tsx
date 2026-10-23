@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }}
         >
           <AppHeader />
-          <main className="saoko-app-main flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28 md:px-8 md:pb-10">
+          <main className={`saoko-app-main flex-1 overflow-x-hidden overflow-y-auto px-4 pb-28 md:px-8 md:pb-10${adminUser && (adminUser.role === 'super_admin' || adminUser.role === 'admin' || adminUser.role === 'teacher') ? ' saoko-wide' : ''}`}>
             {children}
           </main>
         </div>

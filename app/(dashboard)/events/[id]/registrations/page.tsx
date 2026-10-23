@@ -22,6 +22,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatCurrency } from '@/lib/utils/currency'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { Dancer, EventCategory, EventRegistration, StudioEvent } from '@/types'
 
 export default function EventRegistrationsPage() {
@@ -114,6 +115,8 @@ export default function EventRegistrationsPage() {
               No hay inscripciones. Un bailarín puede inscribirse a varias categorías; el Full Pass se cobra una sola vez.
             </p>
           ) : (
+            <PagedTable items={registrations}>
+            {rows => (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -129,7 +132,7 @@ export default function EventRegistrationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.map(r => (
+                {rows.map(r => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium min-w-0"><span className="truncate block">{r.dancerName}</span></TableCell>
                     <TableCell className="max-md:hidden">{r.categoryName}</TableCell>
@@ -152,6 +155,8 @@ export default function EventRegistrationsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
+            </PagedTable>
           )}
         </CardContent>
       </Card>

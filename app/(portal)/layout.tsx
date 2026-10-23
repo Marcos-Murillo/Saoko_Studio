@@ -19,13 +19,15 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (loading) return
+    const keepsPortal = adminUser?.role === 'student' || (adminUser?.role === 'teacher' && !!adminUser.dancerId)
     if (!user) router.replace('/login')
-    else if (adminUser && adminUser.role !== 'student') router.replace(homeForRole(adminUser.role))
+    else if (adminUser && !keepsPortal) router.replace(homeForRole(adminUser.role))
   }, [user, adminUser, loading, router])
 
   if (loading) return <PortalLoader />
+  const keepsPortal = adminUser?.role === 'student' || (adminUser?.role === 'teacher' && !!adminUser.dancerId)
   if (!user) return null
-  if (adminUser && adminUser.role !== 'student') return null
+  if (adminUser && !keepsPortal) return null
   if (!adminUser) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[var(--background)] px-6 text-center text-[var(--foreground)]">

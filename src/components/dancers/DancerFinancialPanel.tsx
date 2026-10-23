@@ -10,6 +10,7 @@ import { formatDate, formatMonth } from '@/lib/utils/dates'
 import { formatCurrency } from '@/lib/utils/currency'
 import { KpiCard } from '@/components/shared/KpiCard'
 import { TableRowMenu } from '@/components/shared/TableRowMenu'
+import { PagedTable } from '@/components/shared/TablePagination'
 import type { MonthlyFee, Payment, DancerCredit } from '@/types'
 
 export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
@@ -59,6 +60,8 @@ export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
 
       {tab === 'fees' && (
         <div className="overflow-x-auto">
+          <PagedTable items={fees}>
+          {rows => (
           <table className="w-full text-sm">
             <thead>
               <tr style={{ color: 'var(--muted-foreground)' }}>
@@ -70,7 +73,7 @@ export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
               </tr>
             </thead>
             <tbody>
-              {fees.map(f => (
+              {rows.map(f => (
                 <tr key={f.id}>
                   <td className="py-2">{formatMonth(f.periodYear, f.periodMonth)}</td>
                   <td className="py-2 max-md:hidden" style={{ color: 'var(--muted-foreground)' }}>{f.groupName}</td>
@@ -89,11 +92,15 @@ export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
               )}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         </div>
       )}
 
       {tab === 'payments' && (
         <div className="overflow-x-auto">
+          <PagedTable items={payments}>
+          {rows => (
           <table className="w-full text-sm">
             <thead>
               <tr style={{ color: 'var(--muted-foreground)' }}>
@@ -104,7 +111,7 @@ export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
               </tr>
             </thead>
             <tbody>
-              {payments.map(p => (
+              {rows.map(p => (
                 <tr key={p.id} style={{ opacity: p.isVoided ? 0.5 : 1 }}>
                   <td className="py-2">{formatDate(p.paymentDate)}</td>
                   <td className="py-2 max-md:hidden">{p.concept}</td>
@@ -119,6 +126,8 @@ export function DancerFinancialPanel({ dancerId }: { dancerId: string }) {
               )}
             </tbody>
           </table>
+          )}
+          </PagedTable>
         </div>
       )}
     </div>

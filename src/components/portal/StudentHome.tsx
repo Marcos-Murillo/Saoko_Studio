@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -57,11 +58,13 @@ export function StudentHome({
   onSignOut,
   onSaveProfile,
   onEnrollGroups,
+  studioHref,
 }: {
   data: StudentPortalData
   onSignOut: () => void
   onSaveProfile: (input: StudentProfile) => Promise<void>
   onEnrollGroups: (groupIds: string[]) => Promise<void>
+  studioHref?: string
 }) {
   const [tab, setTab] = useState<Tab>('inicio')
   const [hidden, setHidden] = useState(false)
@@ -104,10 +107,15 @@ export function StudentHome({
             )
           })}
         </nav>
+        {studioHref && (
+          <Link href={studioHref} className="mt-auto flex h-11 items-center gap-3 rounded-full px-4 text-sm font-semibold text-[var(--gold)]">
+            Panel del estudio
+          </Link>
+        )}
         <button
           type="button"
           onClick={onSignOut}
-          className="mt-auto flex h-11 items-center gap-3 rounded-full px-4 text-sm font-semibold text-[#a09070]"
+          className={`${studioHref ? '' : 'mt-auto '}flex h-11 items-center gap-3 rounded-full px-4 text-sm font-semibold text-[#a09070]`}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
         >
           <LogOut size={18} />
@@ -122,9 +130,14 @@ export function StudentHome({
               <img src={MARK} alt="" className="h-8 w-8 object-contain" />
               <p className="text-sm font-bold text-[var(--gold)]">Nexora</p>
             </div>
-            <button type="button" onClick={onSignOut} className="text-sm font-semibold text-[#a09070]" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-              Salir
-            </button>
+            <div className="flex items-center gap-3">
+              {studioHref && (
+                <Link href={studioHref} className="text-sm font-semibold text-[var(--gold)]">Panel</Link>
+              )}
+              <button type="button" onClick={onSignOut} className="text-sm font-semibold text-[#a09070]" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                Salir
+              </button>
+            </div>
           </div>
           <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">
             {tab === 'inicio' ? 'Mi espacio' : month}
