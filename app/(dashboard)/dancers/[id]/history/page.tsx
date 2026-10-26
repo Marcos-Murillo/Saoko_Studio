@@ -4,7 +4,7 @@ import { use } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { getDancerById } from '@/lib/services/dancer.service'
-import { getDancerMemberships } from '@/lib/services/group.service'
+import { getDancerMemberships, membershipFeeText } from '@/lib/services/group.service'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
 import { formatDate } from '@/lib/utils/dates'
 import { formatCurrency } from '@/lib/utils/currency'
@@ -62,13 +62,13 @@ export default function DancerHistoryPage({ params }: { params: Promise<{ id: st
                   <td style={{ fontWeight: 500 }} className="min-w-0"><span className="truncate block">{m.groupName}</span></td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{formatDate(m.startDate)}</td>
                   <td className="max-md:hidden" style={{ color: 'var(--text-secondary)' }}>{m.endDate ? formatDate(m.endDate) : '—'}</td>
-                  <td className="max-md:hidden" style={{ color: 'var(--gold)', fontWeight: 500 }}>{m.chargesFee === false ? 'Sin cobro' : formatCurrency(m.monthlyFeeSnapshot)}</td>
+                  <td className="max-md:hidden" style={{ color: 'var(--gold)', fontWeight: 500 }}>{membershipFeeText(m, formatCurrency(m.monthlyFeeSnapshot))}</td>
                   <td>{m.isCurrent ? <span className="badge-paid">Actual</span> : <span className="badge-pending">Histórico</span>}</td>
                   <td className="saoko-col-action">
                     <TableRowMenu details={[
                       { label: 'Inicio', value: formatDate(m.startDate) },
                       { label: 'Fin', value: m.endDate ? formatDate(m.endDate) : '—' },
-                      { label: 'Mensualidad', value: m.chargesFee === false ? 'Sin cobro' : formatCurrency(m.monthlyFeeSnapshot) },
+                      { label: 'Mensualidad', value: membershipFeeText(m, formatCurrency(m.monthlyFeeSnapshot)) },
                     ]} />
                   </td>
                 </tr>

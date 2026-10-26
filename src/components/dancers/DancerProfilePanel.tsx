@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Phone, Mail, MapPin, Heart, Calendar, DollarSign, User } from 'lucide-react'
 import { getDancerById, getDancerGuardians } from '@/lib/services/dancer.service'
-import { getDancerCurrentMemberships } from '@/lib/services/group.service'
+import { getDancerCurrentMemberships, membershipFeeSuffix } from '@/lib/services/group.service'
 import { getDancerCredit } from '@/lib/services/credit.service'
 import { ActiveBadge } from '@/components/shared/StatusBadge'
 import { PageLoader } from '@/components/shared/LoadingSpinner'
@@ -80,7 +80,7 @@ export function DancerProfilePanel({
       <div className="flex gap-2 flex-wrap">
         {current.map(m => (
           <Badge key={m.id} style={{ background: 'var(--gold-muted)', color: 'var(--gold)', border: 'none' }}>
-            {m.groupName}{m.chargesFee === false ? ' · sin mensualidad' : ''}
+            {m.groupName}{membershipFeeSuffix(m)}
           </Badge>
         ))}
       </div>

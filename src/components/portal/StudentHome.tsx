@@ -310,7 +310,7 @@ function MonthAside({ data, month, hidden }: { data: StudentPortalData; month: s
               <p className="text-xs text-[#a09070]">{group.teacher || 'Profesor por confirmar'}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold">{group.chargesFee ? money(group.monthRemaining || group.monthlyFee, hidden) : 'Incluido'}</p>
+              <p className="text-sm font-semibold">{group.feeWaiver === 'instructor' ? 'Exento' : group.chargesFee ? money(group.monthRemaining || group.monthlyFee, hidden) : 'Incluido'}</p>
               <StatusPill status={group.monthStatus} />
             </div>
           </div>
@@ -415,7 +415,9 @@ function GroupsBlock({
                 </div>
                 <StatusPill status={group.monthStatus} />
               </div>
-              {group.chargesFee ? (
+              {group.feeWaiver === 'instructor' ? (
+                <p className="mt-4 text-lg font-bold tracking-tight text-[var(--gold-light)]">Exento</p>
+              ) : group.chargesFee ? (
                 <p className="mt-4 text-2xl font-bold tracking-tight text-[var(--gold-light)]">{money(group.monthlyFee, hidden)}<span className="text-sm font-medium text-[#a09070]"> / mes</span></p>
               ) : (
                 <p className="mt-4 text-lg font-bold tracking-tight text-[var(--gold-light)]">Sin cobro adicional</p>

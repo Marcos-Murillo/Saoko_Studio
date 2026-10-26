@@ -90,7 +90,7 @@ function TeacherGroupPicker({
     <div className="flex flex-col gap-2" style={{ gridColumn: '1 / -1' }}>
       <Label style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Grupos que va a dictar *</Label>
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        Si también es bailarín, sigue inscrito en sus grupos. Aquí solo queda como profesor.
+        Si también es bailarín, no paga ningún grupo en el que esté inscrito.
       </p>
       <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-xl p-2" style={{ border: '1px solid var(--border)' }}>
         {groups.length === 0 && (
@@ -562,7 +562,7 @@ export default function UsersPage() {
             <DialogTitle style={{ color: 'var(--foreground)' }}>Grupos de {teacherTarget?.name}</DialogTitle>
           </DialogHeader>
           <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            Elige los grupos que va a dictar. Si es bailarín, no se retira de ninguno.
+            Elige los grupos que va a dictar. Si es bailarín, queda exento de la mensualidad de todos los grupos en los que esté inscrito.
           </p>
           <TeacherGroupPicker groups={catalog} selected={teacherGroups} onChange={setTeacherGroups} />
           <div className="flex justify-end gap-2">

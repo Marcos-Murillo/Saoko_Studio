@@ -17,8 +17,33 @@ import { COLLECTIONS } from '@/lib/firebase/collections'
 import type { Group, GroupMembership } from '@/types'
 import { isDobleProcesoName } from '@/lib/utils/dancerCategories'
 import { getSchedulesByGroup, updateSchedule } from '@/lib/services/schedule.service'
+import { normalizeDocumentNumber } from '@/lib/auth/identity'
 
 const SECOND_GROUP_NOTE = 'Segundo grupo de Doble Proceso. No genera mensualidad.'
+
+export function isInstructorWaiver(membership: { feeWaiver?: string | null }): boolean {
+  return membership.feeWaiver === 'instructor'
+}
+
+/** Segundo grupo de Doble Proceso. El grupo que dicta el profesor no entra aquí. */
+export function isSecondGroupMembership(membership: { chargesFee?: boolean; feeWaiver?: string | null }): boolean {
+  return membership.chargesFee === false && !isInstructorWaiver(membership)
+}
+
+export function membershipFeeText(
+  membership: { chargesFee?: boolean; feeWaiver?: string | null },
+  formattedAmount: string,
+): string {
+  if (isInstructorWaiver(membership)) return 'Exento'
+  if (membership.chargesFee === false) return 'Sin cobro'
+  return formattedAmount
+}
+
+export function membershipFeeSuffix(membership: { chargesFee?: boolean; feeWaiver?: string | null }): string {
+  if (isInstructorWaiver(membership)) return ' · exento'
+  if (membership.chargesFee === false) return ' · sin mensualidad'
+  return ''
+}
 
 export async function syncDancerCurrentGroup(dancerId: string): Promise<void> {
   const current = await getDancerCurrentMemberships(dancerId)
@@ -73,10 +98,147 @@ export async function createGroup(
   return ref.id
 }
 
-/** Vincula o retira al profesor del grupo. No toca la matrícula de bailarín. */
+async function resolveTeacherDancerId(userId: string): Promise<string | null> {
+  const snap = await getDoc(doc(db, COLLECTIONS.ADMIN_USERS, userId))
+  if (!snap.exists()) return null
+  const data = snap.data()
+  if (data.role !== 'teacher' || data.isActive === false) return null
+  if (typeof data.dancerId === 'string' && data.dancerId) return data.dancerId
+  const cedula = normalizeDocumentNumber(String(data.documentNumber ?? ''))
+  if (!cedula) return null
+  for (const field of ['documentKey', 'documentNumber']) {
+    const matches = await getDocs(query(collection(db, COLLECTIONS.DANCERS), where(field, '==', cedula)))
+    if (!matches.empty) return matches.docs[0].id
+  }
+  return null
+}
+
+async function dancerIsInstructor(dancerId: string): Promise<boolean> {
+  const groups = await getGroups(false)
+  if (groups.some(group => group.instructorDancerId === dancerId)) return true
+  for (const group of groups) {
+    if (!group.instructorId || group.instructorDancerId) continue
+    try {
+      const linked = await resolveTeacherDancerId(group.instructorId)
+      if (linked === dancerId) return true
+    } catch {
+      // Sin permiso para leer usuarios, la ficha del grupo basta.
+    }
+  }
+  return false
+}
+
+/** El profesor no paga ningún grupo en el que esté inscrito. Si deja de ser profesor, la mensualidad vuelve. */
+async function applyInstructorWaiver(dancerId: string, exempt: boolean): Promise<void> {
+  const memberships = await getDancerCurrentMemberships(dancerId)
+  const dancerSnap = await getDoc(doc(db, COLLECTIONS.DANCERS, dancerId))
+  const secondGroupId = typeof dancerSnap.data()?.secondGroupId === 'string' ? dancerSnap.data()?.secondGroupId as string : ''
+  const dancerName = String(dancerSnap.data()?.fullName ?? '')
+  const { removeUnpaidFeesForGroup, generateFeeForDancer } = await import('./fee.service')
+  const { currentYearMonth } = await import('@/lib/utils/dates')
+
+  for (const membership of memberships) {
+    if (exempt) {
+      if (membership.chargesFee !== false || membership.feeWaiver !== 'instructor') {
+        await updateDoc(doc(db, COLLECTIONS.GROUP_MEMBERSHIPS, membership.id), {
+          chargesFee: false,
+          feeWaiver: 'instructor',
+          updatedAt: serverTimestamp(),
+        })
+      }
+      await removeUnpaidFeesForGroup(dancerId, membership.groupId)
+      continue
+    }
+    if (membership.feeWaiver !== 'instructor') continue
+    if (membership.groupId === secondGroupId) {
+      await updateDoc(doc(db, COLLECTIONS.GROUP_MEMBERSHIPS, membership.id), {
+        chargesFee: false,
+        feeWaiver: null,
+        notes: membership.notes || SECOND_GROUP_NOTE,
+        updatedAt: serverTimestamp(),
+      })
+      continue
+    }
+    await updateDoc(doc(db, COLLECTIONS.GROUP_MEMBERSHIPS, membership.id), {
+      chargesFee: true,
+      feeWaiver: null,
+      updatedAt: serverTimestamp(),
+    })
+    const group = await getGroupById(membership.groupId)
+    if (!group || group.isActive === false) continue
+    const { year, month } = currentYearMonth()
+    await generateFeeForDancer(
+      dancerId,
+      dancerName || membership.dancerName || '',
+      membership.groupId,
+      group.name,
+      group.monthlyFee,
+      year,
+      month,
+    )
+  }
+}
+
+/** Alinea la exención de los profesores ya vinculados. Si no hay permiso, no interrumpe la caja. */
+export async function exemptInstructorMemberships(): Promise<void> {
+  const groups = await getGroups(false)
+  const taughtByDancer = new Map<string, Set<string>>()
+
+  for (const group of groups) {
+    if (!group.instructorId) continue
+    let dancerId = group.instructorDancerId ?? null
+    if (!dancerId) {
+      try {
+        dancerId = await resolveTeacherDancerId(group.instructorId)
+        if (dancerId) {
+          await updateDoc(doc(db, COLLECTIONS.GROUPS, group.id), {
+            instructorDancerId: dancerId,
+            updatedAt: serverTimestamp(),
+          })
+        }
+      } catch {
+        continue
+      }
+    }
+    if (!dancerId) continue
+    const taught = taughtByDancer.get(dancerId) ?? new Set<string>()
+    taught.add(group.id)
+    taughtByDancer.set(dancerId, taught)
+  }
+
+  try {
+    const waived = await getDocs(query(
+      collection(db, COLLECTIONS.GROUP_MEMBERSHIPS),
+      where('feeWaiver', '==', 'instructor'),
+    ))
+    waived.docs.forEach(item => {
+      if (item.data().isCurrent !== true) return
+      const dancerId = String(item.data().dancerId ?? '')
+      if (dancerId && !taughtByDancer.has(dancerId)) taughtByDancer.set(dancerId, new Set())
+    })
+  } catch {
+    // Sin índice o sin permiso, la vinculación del profesor igual aplica la exención.
+  }
+
+  for (const [dancerId, taught] of taughtByDancer) {
+    try {
+      await applyInstructorWaiver(dancerId, taught.size > 0)
+    } catch {
+      // Quien no administra la caja no puede reescribir matrículas.
+    }
+  }
+}
+
+/** Vincula o retira al profesor del grupo. Si es bailarín, no paga ningún grupo en el que esté inscrito. */
 export async function assignTeacherGroups(userId: string, userName: string, groupIds: string[]): Promise<void> {
   const groups = await getGroups(false)
   const chosen = new Set(groupIds)
+  let dancerId: string | null = null
+  try {
+    dancerId = await resolveTeacherDancerId(userId)
+  } catch {
+    dancerId = null
+  }
   await Promise.all(groups.map(async group => {
     const teaches = group.instructorId === userId
     const selected = chosen.has(group.id)
@@ -86,11 +248,13 @@ export async function assignTeacherGroups(userId: string, userName: string, grou
     await updateDoc(doc(db, COLLECTIONS.GROUPS, group.id), {
       instructorId,
       instructorName,
+      instructorDancerId: selected ? dancerId : null,
       updatedAt: serverTimestamp(),
     })
     const classes = await getSchedulesByGroup(group.id)
     await Promise.all(classes.map(item => updateSchedule(item.id, { instructorId, instructorName })))
   }))
+  if (dancerId) await applyInstructorWaiver(dancerId, chosen.size > 0)
 }
 
 export async function updateGroup(id: string, data: Partial<Group>): Promise<void> {
@@ -123,7 +287,7 @@ export async function syncOpenRecordsForGroup(group: Group): Promise<void> {
       await updateDoc(doc(db, COLLECTIONS.GROUP_MEMBERSHIPS, m.id), patch)
     }
     await syncDancerCurrentGroup(m.dancerId)
-    if (m.chargesFee === false) {
+    if (isSecondGroupMembership(m)) {
       await updateDoc(doc(db, COLLECTIONS.DANCERS, m.dancerId), {
         secondGroupId: group.id,
         secondGroupName: group.name,
@@ -196,8 +360,19 @@ export async function enrollDancer(
       where('isCurrent', '==', true),
     ),
   )
+  const instructorExempt = await dancerIsInstructor(dancerId)
   if (!existing.empty) {
     const current = existing.docs[0]
+    if (instructorExempt) {
+      await updateDoc(current.ref, {
+        chargesFee: false,
+        feeWaiver: 'instructor',
+        updatedAt: serverTimestamp(),
+      })
+      const { removeUnpaidFeesForGroup } = await import('./fee.service')
+      await removeUnpaidFeesForGroup(dancerId, groupId)
+      return current.id
+    }
     const chargesNow = current.data().chargesFee !== false
     if (options?.chargesFee === false && chargesNow) {
       await updateDoc(current.ref, {
@@ -220,7 +395,7 @@ export async function enrollDancer(
     return current.id
   }
 
-  const chargesFee = options?.chargesFee !== false
+  const chargesFee = instructorExempt ? false : options?.chargesFee !== false
   const ref = await addDoc(collection(db, COLLECTIONS.GROUP_MEMBERSHIPS), {
     dancerId,
     dancerName,
@@ -231,7 +406,8 @@ export async function enrollDancer(
     isCurrent: true,
     monthlyFeeSnapshot,
     chargesFee,
-    notes: chargesFee ? notes : (notes || SECOND_GROUP_NOTE),
+    feeWaiver: instructorExempt ? 'instructor' : null,
+    notes: chargesFee ? notes : (instructorExempt ? notes : (notes || SECOND_GROUP_NOTE)),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
@@ -259,7 +435,7 @@ export async function saveDancerSecondGroup(
   secondGroup: { id: string; name: string; monthlyFee: number } | null,
 ): Promise<void> {
   const memberships = await getDancerCurrentMemberships(dancerId)
-  const free = memberships.filter(m => m.chargesFee === false)
+  const free = memberships.filter(isSecondGroupMembership)
   const { removeUnpaidFeesForGroup } = await import('./fee.service')
 
   if (!secondGroup) {

@@ -5,7 +5,7 @@ import { normalizeDocumentNumber } from '@/lib/auth/identity'
 import { parseLocalDateInput, toDateInputValue } from '@/lib/utils/localDate'
 import { missingProfileFields } from './dancerClaim.service'
 import { getDancerById } from './dancer.service'
-import { getDancerCurrentMemberships, getGroupById } from './group.service'
+import { getDancerCurrentMemberships, getGroupById, getGroups } from './group.service'
 import { getSchedulesByGroup } from './schedule.service'
 import { getMonthlyFeesByDancer, monthPayStatus, type MonthPayStatus } from './fee.service'
 import { getPaymentsByDancer } from './payment.service'
@@ -35,8 +35,9 @@ export interface PortalGroup {
   level: string
   teacher: string
   monthlyFee: number
-  /** false cuando es el segundo grupo de Doble Proceso: asiste y no se cobra. */
+  /** false cuando asiste y no se cobra: segundo grupo, o es profesor inscrito en cualquier grupo. */
   chargesFee: boolean
+  feeWaiver?: 'instructor' | null
   monthStatus: FeeStatus | 'none'
   monthRemaining: number
   classes: PortalClass[]
@@ -116,6 +117,10 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
     return { membership, group, classes }
   }))
 
+  const catalog = await getGroups(false)
+  const isInstructor = catalog.some(group => group.instructorDancerId === dancerId)
+    || memberships.some(membership => membership.feeWaiver === 'instructor')
+
   const groups: PortalGroup[] = scheduleGroups.map(({ membership, group, classes }) => {
     const monthFees = fees.filter(fee =>
       fee.groupId === membership.groupId && fee.periodYear === year && fee.periodMonth === month,
@@ -136,7 +141,8 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
       }))
       .sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day) || a.start.localeCompare(b.start))
 
-    const chargesFee = membership.chargesFee !== false
+    const instructorExempt = isInstructor
+    const chargesFee = membership.chargesFee !== false && !instructorExempt
     return {
       id: membership.groupId,
       name: membership.groupName || group?.name || 'Grupo',
@@ -145,6 +151,7 @@ export async function getStudentPortal(dancerId: string): Promise<StudentPortalD
       teacher,
       monthlyFee: chargesFee ? (membership.monthlyFeeSnapshot || group?.monthlyFee || 0) : 0,
       chargesFee,
+      feeWaiver: instructorExempt ? 'instructor' as const : null,
       monthStatus: chargesFee ? groupMonthStatus(monthFees) : 'none',
       monthRemaining: chargesFee ? monthRemaining : 0,
       classes: portalClasses,

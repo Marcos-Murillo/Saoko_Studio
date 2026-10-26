@@ -3,7 +3,7 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pencil, UserPlus, UserMinus, DollarSign, CalendarDays, Trash2 } from 'lucide-react'
-import { getGroupById, getGroupMembers, enrollDancer, unenrollDancer, updateGroup, deleteGroup } from '@/lib/services/group.service'
+import { getGroupById, getGroupMembers, enrollDancer, unenrollDancer, updateGroup, deleteGroup, membershipFeeSuffix } from '@/lib/services/group.service'
 import { getDancers } from '@/lib/services/dancer.service'
 import { getSchedulesByGroup } from '@/lib/services/schedule.service'
 import { useAuth } from '@/lib/auth/AuthContext'
@@ -168,7 +168,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <div>
                   <p style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 500 }}>{m.dancerName}</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Desde {formatDate(m.startDate)}{m.chargesFee === false ? ' · sin mensualidad' : ''}</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Desde {formatDate(m.startDate)}{membershipFeeSuffix(m)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {canWrite && (

@@ -144,6 +144,8 @@ export interface Group extends BaseEntity {
   isActive: boolean
   instructorId: string | null
   instructorName?: string | null
+  /** Ficha del profesor, cuando también es bailarín. No paga ningún grupo en el que esté inscrito. */
+  instructorDancerId?: string | null
   memberCount?: number   // computed
 }
 
@@ -158,10 +160,12 @@ export interface GroupMembership extends BaseEntity {
   /** Price snapshot at time of enrollment — never changes retroactively */
   monthlyFeeSnapshot: number
   /**
-   * false = segundo grupo de Doble Proceso: asiste y no genera mensualidad.
+   * false = asiste y no genera mensualidad.
    * Sin valor, o true, el grupo sí se cobra.
    */
   chargesFee?: boolean
+  /** instructor = el profesor no paga los grupos en los que está inscrito. No es el segundo grupo de Doble Proceso. */
+  feeWaiver?: 'instructor' | null
   notes: string
 }
 

@@ -10,6 +10,7 @@
  * 5. Duplicate fees for same (dancer, group, year, month) are prevented.
  * 6. A membership with chargesFee === false does not generate a fee.
  *    Doble Proceso adds a second group the dancer attends, but only the main group is billed.
+ *    A teacher who also dances does not pay any group they are enrolled in.
  */
 import {
   collection,
@@ -206,6 +207,9 @@ export async function syncOpenFeesForGroup(group: Group): Promise<void> {
 
 /** Alinea caja con grupos reales: quita huérfanos y actualiza nombre/precio vivos. */
 export async function reconcileOpenFeesWithGroups(): Promise<void> {
+  const { exemptInstructorMemberships } = await import('./group.service')
+  await exemptInstructorMemberships()
+
   const [groupsSnap, membershipsSnap, feesSnap] = await Promise.all([
     getDocs(collection(db, COLLECTIONS.GROUPS)),
     getDocs(query(collection(db, COLLECTIONS.GROUP_MEMBERSHIPS), where('isCurrent', '==', true))),
@@ -296,16 +300,29 @@ export async function generateMonthlyFees(
 
   const groupsSnap = await getDocs(collection(db, COLLECTIONS.GROUPS))
   const groups = new Map(groupsSnap.docs.map(d => [d.id, snapToEntity<Group>(d)]))
+  const instructorDancers = new Set(
+    [...groups.values()].map(group => group.instructorDancerId).filter((id): id is string => !!id),
+  )
 
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
-    if (membership.chargesFee === false) {
+    const group = groups.get(String(membership.groupId ?? ''))
+    if (!group || group.isActive === false) {
       skipped++
       continue
     }
-
-    const group = groups.get(String(membership.groupId ?? ''))
-    if (!group || group.isActive === false) {
+    const exemptInstructor = instructorDancers.has(membership.dancerId as string)
+    if (membership.chargesFee === false || exemptInstructor) {
+      if (exemptInstructor) {
+        if (membership.chargesFee !== false || membership.feeWaiver !== 'instructor') {
+          await updateDoc(membershipDoc.ref, {
+            chargesFee: false,
+            feeWaiver: 'instructor',
+            updatedAt: serverTimestamp(),
+          })
+        }
+        await removeUnpaidFeesForGroup(membership.dancerId as string, group.id)
+      }
       skipped++
       continue
     }
@@ -350,20 +367,34 @@ export async function ensureDancerMonthFees(
   const dancerSnap = await getDoc(doc(db, COLLECTIONS.DANCERS, dancerId))
   if (!dancerSnap.exists() || !dancerSnap.data().isActive) return
 
-  const membershipsSnap = await getDocs(
-    query(
+  const [membershipsSnap, groupsSnap] = await Promise.all([
+    getDocs(query(
       collection(db, COLLECTIONS.GROUP_MEMBERSHIPS),
       where('dancerId', '==', dancerId),
       where('isCurrent', '==', true),
-    ),
-  )
+    )),
+    getDocs(collection(db, COLLECTIONS.GROUPS)),
+  ])
+  const isInstructor = groupsSnap.docs.some(group => group.data().instructorDancerId === dancerId)
 
   for (const membershipDoc of membershipsSnap.docs) {
     const membership = membershipDoc.data()
-    if (membership.chargesFee === false) continue
     const groupSnap = await getDoc(doc(db, COLLECTIONS.GROUPS, membership.groupId as string))
     if (!groupSnap.exists() || groupSnap.data().isActive === false) continue
     const group = snapToEntity<Group>(groupSnap)
+    if (isInstructor || membership.chargesFee === false) {
+      if (isInstructor) {
+        if (membership.chargesFee !== false || membership.feeWaiver !== 'instructor') {
+          await updateDoc(membershipDoc.ref, {
+            chargesFee: false,
+            feeWaiver: 'instructor',
+            updatedAt: serverTimestamp(),
+          })
+        }
+        await removeUnpaidFeesForGroup(dancerId, group.id)
+      }
+      continue
+    }
     await generateFeeForDancer(
       dancerId,
       (membership.dancerName as string) ?? (dancerSnap.data().fullName as string),

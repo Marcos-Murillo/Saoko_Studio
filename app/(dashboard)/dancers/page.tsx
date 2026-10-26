@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Search, UserX, MoreHorizontal, UserMinus, DollarSign, UserPlus, Download, Pencil, ChevronLeft, MousePointerClick, FolderInput, Tags } from 'lucide-react'
 import { getDancers, updateDancer, deactivateDancer, reactivateDancer } from '@/lib/services/dancer.service'
-import { getDancerCurrentMemberships, getGroups, enrollDancer, unenrollDancer, persistSecondGroupChoice, saveDancerSecondGroup } from '@/lib/services/group.service'
+import { getDancerCurrentMemberships, getGroups, enrollDancer, unenrollDancer, persistSecondGroupChoice, saveDancerSecondGroup, isInstructorWaiver } from '@/lib/services/group.service'
 import { getCategories } from '@/lib/services/catalog.service'
 import { registerPayment } from '@/lib/services/payment.service'
 import { getPaymentMethods } from '@/lib/services/catalog.service'
@@ -371,7 +371,7 @@ export default function DancersPage() {
         if (!group) throw new Error('Selecciona un grupo')
         for (const dancer of picked) {
           const memberships = await getDancerCurrentMemberships(dancer.id)
-          const targetWasFree = memberships.some(m => m.groupId === group.id && m.chargesFee === false)
+          const targetWasFree = memberships.some(m => m.groupId === group.id && m.chargesFee === false && !isInstructorWaiver(m))
           for (const membership of memberships) {
             if (membership.groupId === group.id) continue
             if (membership.chargesFee === false) continue
