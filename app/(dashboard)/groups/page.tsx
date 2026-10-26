@@ -29,6 +29,7 @@ export default function GroupsPage() {
   const toast = useToast()
   const { adminUser } = useAuth()
   const canWrite = !!adminUser && PERMISSIONS.canManageGroups(adminUser.role)
+  const canOpenGroup = adminUser?.role === 'super_admin' || adminUser?.role === 'admin' || adminUser?.role === 'teacher'
   const [groups,  setGroups]  = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [search,  setSearch]  = useState('')
@@ -181,7 +182,7 @@ export default function GroupsPage() {
                       <p className="text-[0.65rem] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Integrantes</p>
                       <p className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{g.memberCount ?? 0}</p>
                     </div>
-                    {adminUser?.role === 'super_admin' && (
+                    {canOpenGroup && (
                       <LinkButton href={`/groups/${g.id}`} variant="primary" size="sm">Ver</LinkButton>
                     )}
                   </div>
